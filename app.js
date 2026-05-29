@@ -118,34 +118,40 @@ function resolveDay(date){
   const k = keyOf(date);
   const adjs = ADJ.filter(a=>a.date===k);
   const eff = {};
-  for (const s of STAFF) eff[s.id] = { base:baseShiftOf(s,date), cuti:false, covers:[], repayOff:false };
+  for (const s of STAFF) eff[s.id] = { base:baseShiftOf(s,date), cuti:false, covers:[], repayOff:false, forceBase:null };
   for (const a of adjs){
-    if (a.type==='cuti') eff[a.staffId].cuti = true;
-    if (a.coverage) eff[a.coverage.covererId].covers.push(a.coverage);
+    if (a.type==='cuti'){ eff[a.staffId].cuti = true; if (a.coverage) eff[a.coverage.covererId].covers.push(a.coverage); }
+    else if (a.type==='swap'){ eff[a.aId].forceBase = baseShiftOf(byId(a.bId),date); eff[a.bId].forceBase = baseShiftOf(byId(a.aId),date); }
+    else if (a.type==='double'){ eff[a.staffId].covers.push({ shift:a.shift, kind:'double-manual' }); }
   }
-  // pelunasan hutang yang dijadwalkan pada tanggal ini: kreditur libur, debitur masuk gantikan
+  // pelunasan hutang terjadwal pada tanggal ini: kreditur libur, debitur masuk gantikan
   for (const d of ADJ){
     if (d.coverage && d.coverage.debt && d.repay && d.repay.date===k){
       eff[d.coverage.covererId].repayOff = true;
       eff[d.staffId].covers.push({ shift:d.repay.shift, kind:'repay' });
     }
   }
+  const tagOf = (tag, dbl) => tag==='swap' ? 'tukar'
+    : tag==='repay' ? 'bayar'
+    : (tag==='double'||tag==='double-manual'||tag==='double-akhir') ? 'double'
+    : tag!=='base' ? 'ganti' : '';
   const byShift = { P:[], S:[], M:[], L:[], C:[] };
   for (const s of STAFF){
     const e = eff[s.id];
     if (e.cuti){ byShift.C.push({ staff:s }); continue; }
-    const base = e.repayOff ? 'L' : e.base;
+    const base = e.repayOff ? 'L' : (e.forceBase!=null ? e.forceBase : e.base);
+    const baseTag = e.forceBase!=null ? 'swap' : 'base';
     const subRole = e.covers.some(c=>c.kind==='substitute'||c.kind==='double-akhir');
     const shifts = [];
-    if (!subRole && ['P','S','M'].includes(base)) shifts.push({ sh:base, tag:'base' });
+    if (!subRole && ['P','S','M'].includes(base)) shifts.push({ sh:base, tag:baseTag });
     for (const c of e.covers) shifts.push({ sh:c.shift, tag:c.kind });
     const seen = {};
     const dbl = shifts.length>1;
     for (const it of shifts){
       if (seen[it.sh]) continue; seen[it.sh]=1;
-      byShift[it.sh].push({ staff:s, cover:it.tag!=='base', double:dbl, repay:it.tag==='repay' });
+      byShift[it.sh].push({ staff:s, tagLabel: tagOf(it.tag, dbl) });
     }
-    if (!shifts.length) byShift.L.push({ staff:s, repay:e.repayOff }); // libur (atau libur karena pelunasan)
+    if (!shifts.length) byShift.L.push({ staff:s });
   }
   const conflicts = [];
   for (const sh of ['P','S','M']) if (byShift[sh].length===0) conflicts.push(sh);
@@ -185,7 +191,7 @@ let addCtx = null; // {date, staffId} saat memilih pengganti
 
 /* ---------------- Komponen ---------------- */
 function chip(staff, key, item){
-  const tag = item && item.cover ? `<span class="chip__tag">${item.double?'double':'ganti'}</span>` : '';
+  const tag = item && item.tagLabel ? `<span class="chip__tag">${item.tagLabel}</span>` : '';
   return `<span class="chip chip--${SHIFT[key].cls}${staff.isUser?' chip--me':''}">${esc(staff.short)}${tag}</span>`;
 }
 function shiftGroup(key, list){
@@ -283,6 +289,16 @@ function renderKalender(){
 }
 
 /* ---------------- Atur (penyesuaian) ---------------- */
+function adjLabel(a){
+  if (a.type==='swap')   return { name:`${byId(a.aId).short} ⇄ ${byId(a.bId).short}`, detail:'Tukar shift' };
+  if (a.type==='double') return { name:byId(a.staffId).short, detail:`Double · +${SHIFT[a.shift].label}` };
+  const s = byId(a.staffId);
+  if (a.coverage){ const c=byId(a.coverage.covererId);
+    const how = a.coverage.kind==='substitute'?'pengganti':a.coverage.kind==='libur'?'dari libur':a.coverage.kind==='double-akhir'?'upaya terakhir':'double';
+    return { name:s.short, detail:`Cuti · diganti ${c.short} (${how})` }; }
+  const belum = s.type==='rotator' && ['P','S','M'].includes(baseShiftOf(s,fromKey(a.date)));
+  return { name:s.short, detail:'Cuti'+(belum?' · belum diganti':'') };
+}
 function renderAtur(){
   const conflicts = allConflicts();
   const debts = debtList();
@@ -295,13 +311,10 @@ function renderAtur(){
     <div class="panel__sub">Semua shift pada hari yang disesuaikan terisi.</div></div>`;
 
   const adjHTML = sorted.length ? sorted.map(a=>{
-    const s = byId(a.staffId);
-    let detail = 'Cuti';
-    if (a.coverage){ const c=byId(a.coverage.covererId); detail = `Cuti · diganti ${esc(c.short)} (${a.coverage.kind==='substitute'?'pengganti':a.coverage.kind==='libur'?'dari libur':a.coverage.kind==='double-akhir'?'upaya terakhir':'double'})`; }
-    else if (['P','S','M'].includes(baseShiftOf(s,fromKey(a.date)))) detail = 'Cuti · belum diganti';
+    const L = adjLabel(a);
     return `<div class="adj">
-      <div class="adj__main"><div class="adj__name">${esc(s.short)}</div>
-        <div class="adj__meta">${fmtKey(a.date)} · ${detail}</div></div>
+      <div class="adj__main"><div class="adj__name">${esc(L.name)}</div>
+        <div class="adj__meta">${fmtKey(a.date)} · ${esc(L.detail)}</div></div>
       <button class="adj__del" type="button" data-deladj="${a.id}" aria-label="Hapus">✕</button></div>`;
   }).join('') : `<div class="empty">Belum ada penyesuaian. Buka Kalender, ketuk tanggal, lalu "Tambah penyesuaian".</div>`;
 
@@ -343,8 +356,8 @@ function openDay(d){
   const myCls = my.state==='cuti'?'cuti':(my.cls||'libur');
   const dayAdj = ADJ.filter(a=>a.date===keyOf(date));
   const adjList = dayAdj.length ? `<div class="sheet__adjs">${dayAdj.map(a=>{
-      const s=byId(a.staffId); const cv=a.coverage?byId(a.coverage.covererId):null;
-      return `<div class="adj adj--sm"><div class="adj__main"><div class="adj__name">${esc(s.short)} cuti${cv?` → ${esc(cv.short)}`:''}</div></div>
+      const L=adjLabel(a);
+      return `<div class="adj adj--sm"><div class="adj__main"><div class="adj__name">${esc(L.name)}</div><div class="adj__meta">${esc(L.detail)}</div></div>
         <button class="adj__del" type="button" data-deladj="${a.id}">✕</button></div>`;}).join('')}</div>` : '';
 
   sheetEl().innerHTML = `
@@ -368,36 +381,72 @@ function openDay(d){
 
 /* ---------------- Lembar: tambah penyesuaian ---------------- */
 function openAdd(d){
-  const date=new Date(state.y,state.m,d);
-  addCtx = { date, day:d };
-  const opts = STAFF.map(s=>{ const sh=baseShiftOf(s,date); return `<option value="${s.id}">${esc(s.short)} — ${SHIFT[sh].label} hari ini</option>`; }).join('');
+  addCtx = { date:new Date(state.y,state.m,d), day:d, kind:'cuti' };
+  renderAddForm();
+}
+function staffOptions(date, sel){
+  return STAFF.map(s=>{ const sh=baseShiftOf(s,date); return `<option value="${s.id}"${s.id===sel?' selected':''}>${esc(s.short)} — ${SHIFT[sh].label}</option>`; }).join('');
+}
+function renderAddForm(){
+  const { date, kind } = addCtx;
+  const dk = keyOf(date), dlabel = `${date.getDate()} ${BULAN[date.getMonth()]} ${date.getFullYear()}`;
+  const seg = `<div class="seg">
+    <button class="seg__b ${kind==='cuti'?'seg__b--on':''}" type="button" data-kind="cuti">Cuti</button>
+    <button class="seg__b ${kind==='tukar'?'seg__b--on':''}" type="button" data-kind="tukar">Tukar</button>
+    <button class="seg__b ${kind==='double'?'seg__b--on':''}" type="button" data-kind="double">Double</button></div>`;
+  let fields;
+  if (kind==='cuti'){
+    fields = `<div class="field"><label>Petugas</label><select id="f1" class="select">${staffOptions(date)}</select></div>
+      <div class="field2">
+        <div class="field"><label>Dari tanggal</label><input id="fStart" class="input" type="date" value="${dk}"></div>
+        <div class="field"><label>Sampai</label><input id="fEnd" class="input" type="date" value="${dk}"></div></div>
+      <p class="hint">Satu hari atau rentang. Pengganti tiap hari diatur di langkah berikutnya.</p>`;
+  } else if (kind==='tukar'){
+    fields = `<div class="field"><label>Petugas A</label><select id="f1" class="select">${staffOptions(date)}</select></div>
+      <div class="field"><label>Tukar shift dengan</label><select id="f2" class="select">${staffOptions(date,'aldi')}</select></div>
+      <p class="hint">Keduanya bertukar shift pada ${dlabel}.</p>`;
+  } else {
+    fields = `<div class="field"><label>Petugas</label><select id="f1" class="select">${staffOptions(date)}</select></div>
+      <div class="field"><label>Ambil shift tambahan</label>
+        <select id="f2" class="select"><option value="P">Pagi</option><option value="S">Sore</option><option value="M">Malam</option></select></div>
+      <p class="hint">Petugas bertugas ganda (double) pada ${dlabel}.</p>`;
+  }
   sheetEl().innerHTML = `
     <div class="sheet__card" role="dialog" aria-modal="true">
       <div class="sheet__grab"></div>
       <div class="sheet__head"><div><div class="sheet__eyebrow">Tambah penyesuaian</div>
-        <div class="sheet__date">${d} ${BULAN[date.getMonth()]} ${date.getFullYear()}</div></div>
+        <div class="sheet__date">${dlabel}</div></div>
         <button class="iconbtn" type="button" data-close>✕</button></div>
-      <div class="field"><label>Petugas yang cuti</label>
-        <select id="adjStaff" class="select">${opts}</select></div>
-      <div class="field"><label>Jenis</label>
-        <div class="seg"><button class="seg__b seg__b--on" type="button" disabled>Cuti</button></div>
-        <p class="hint" style="margin-top:8px">Tukar shift & double manual menyusul — saat ini lewat alur cuti + pengganti.</p></div>
+      <div class="field"><label>Jenis</label>${seg}</div>
+      ${fields}
       <button class="bigbtn" type="button" data-addnext>Lanjut</button>
     </div>`;
   sheetEl().classList.add('is-open');
 }
 function addNext(){
-  const id = document.getElementById('adjStaff').value;
-  const s = byId(id), date = addCtx.date, k = keyOf(date);
-  const base = baseShiftOf(s, date);
-  addCtx.staffId = id;
-  // cadangan atau rotator yang memang libur → cuti langsung, tak perlu pengganti
-  if (s.type==='cadangan' || base==='L'){
-    addAdj({ type:'cuti', staffId:id, date:k, coverage:null });
+  const val = id => document.getElementById(id).value;
+  const kind = addCtx.kind;
+  if (kind==='tukar'){
+    const aId=val('f1'), bId=val('f2');
+    if (aId===bId) return;
+    addAdj({ type:'swap', date:keyOf(addCtx.date), aId, bId });
     closeSheet(); render(); return;
   }
-  // rotator pada shift kerja → pemilih pengganti berwarna
-  renderPicker();
+  if (kind==='double'){
+    addAdj({ type:'double', date:keyOf(addCtx.date), staffId:val('f1'), shift:val('f2') });
+    closeSheet(); render(); return;
+  }
+  // cuti — bisa satu hari atau rentang
+  const id=val('f1'); addCtx.staffId=id;
+  let a=fromKey(val('fStart')), b=fromKey(val('fEnd'));
+  if (b<a){ const t=a; a=b; b=t; }
+  const days=[]; for (let dt=new Date(a); dt<=b; dt=addDays(dt,1)) days.push(new Date(dt));
+  if (days.length===1){
+    const day=days[0], base=baseShiftOf(byId(id),day);
+    if (byId(id).type==='cadangan' || base==='L'){ addAdj({ type:'cuti', staffId:id, date:keyOf(day), coverage:null }); closeSheet(); render(); return; }
+    addCtx.date=day; renderPicker(); return;
+  }
+  buildRangePlan(id, days); renderRangeReview();
 }
 function renderPicker(){
   const { date, staffId } = addCtx;
@@ -428,6 +477,72 @@ function applyCover(val){
   if (covererId) adj.coverage = { covererId, shift:X, kind, color, debt:debt==='1' };
   addAdj(adj);
   closeSheet(); render();
+}
+
+/* ---------------- Lembar: cuti rentang (rencana per hari) ---------------- */
+let rangePlan = null;
+function buildRangePlan(staffId, days){
+  const s = byId(staffId);
+  const items = days.map(dt=>{
+    const base = baseShiftOf(s, dt);
+    if (s.type==='cadangan' || base==='L') return { date:keyOf(dt), shift:base, off:true, cover:null };
+    const top = candidatesFor(staffId, dt).list.find(c=>c.color!=='red');
+    return { date:keyOf(dt), shift:base, off:false,
+      cover: top ? { covererId:top.covererId, shift:top.X, kind:top.kind, color:top.color, debt:top.debt } : null };
+  });
+  rangePlan = { staffId, items };
+}
+const dlabelShort = k => { const d=fromKey(k); return `${HARI3[(d.getDay()+6)%7]}, ${d.getDate()} ${BULAN3[d.getMonth()]}`; };
+function renderRangeReview(){
+  const s=byId(rangePlan.staffId), items=rangePlan.items;
+  const rows = items.map((it,i)=>{
+    if (it.off) return `<div class="rev"><span class="rev__d">${dlabelShort(it.date)}</span><span class="rev__s">Libur — tak perlu pengganti</span></div>`;
+    if (!it.cover) return `<button class="rev rev--empty" type="button" data-rangepick="${i}"><span class="rev__d">${dlabelShort(it.date)} · ${SHIFT[it.shift].label}</span><span class="rev__s">Kosong — ketuk untuk atur</span></button>`;
+    const cv=byId(it.cover.covererId);
+    return `<button class="rev rev--${it.cover.color}" type="button" data-rangepick="${i}"><span class="rev__d">${dlabelShort(it.date)} · ${SHIFT[it.shift].label}</span><span class="rev__s"><span class="cand__dot"></span>${esc(cv.short)} · ${coverHow(it.cover)}</span></button>`;
+  }).join('');
+  const fk=fromKey(items[0].date), lk=fromKey(items[items.length-1].date);
+  sheetEl().innerHTML = `
+    <div class="sheet__card" role="dialog" aria-modal="true">
+      <div class="sheet__grab"></div>
+      <div class="sheet__head"><div><div class="sheet__eyebrow">Cuti ${esc(s.short)}</div>
+        <div class="sheet__date">${fk.getDate()} ${BULAN3[fk.getMonth()]} – ${lk.getDate()} ${BULAN3[lk.getMonth()]} ${lk.getFullYear()}</div></div>
+        <button class="iconbtn" type="button" data-close>✕</button></div>
+      <p class="hint">Pengganti dipilih otomatis (Muhraini diutamakan). Ketuk hari untuk mengganti.</p>
+      <div class="revs">${rows}</div>
+      <button class="bigbtn" type="button" data-rangeapply>Terapkan · ${items.length} hari</button>
+    </div>`;
+  sheetEl().classList.add('is-open');
+}
+function renderRangePicker(i){
+  const it = rangePlan.items[i];
+  const { X, list } = candidatesFor(rangePlan.staffId, fromKey(it.date));
+  const rows = list.map(c=>{
+    const cv=byId(c.covererId), dis=c.color==='red';
+    return `<button class="cand cand--${c.color}" type="button" ${dis?'disabled':`data-rangecover="${i}|${c.covererId}|${c.X}|${c.kind}|${c.color}|${c.debt?1:0}"`}>
+      <span class="cand__dot"></span>
+      <span class="cand__body"><span class="cand__name">${esc(cv.short)}</span><span class="cand__how">${coverHow(c)}</span></span>
+      <span class="cand__badge cand__badge--${c.color}">${COVER_COLOR[c.color]}</span></button>`;
+  }).join('');
+  sheetEl().innerHTML = `
+    <div class="sheet__card" role="dialog" aria-modal="true">
+      <div class="sheet__grab"></div>
+      <div class="sheet__head"><div><div class="sheet__eyebrow">Pengganti · ${dlabelShort(it.date)}</div>
+        <div class="sheet__date">${esc(byId(rangePlan.staffId).short)} cuti · ${SHIFT[X].label}</div></div>
+        <button class="iconbtn" type="button" data-rangeback>‹</button></div>
+      <div class="cands">${rows||'<div class="empty">Tidak ada kandidat.</div>'}</div>
+      <button class="bigbtn bigbtn--ghost" type="button" data-rangecover="${i}||${X}||none|0">Biarkan kosong</button>
+    </div>`;
+  sheetEl().classList.add('is-open');
+}
+function setRangeCover(v){
+  const p=v.split('|'), i=+p[0], covererId=p[1];
+  rangePlan.items[i].cover = covererId ? { covererId, shift:p[2], kind:p[3], color:p[4], debt:p[5]==='1' } : null;
+  renderRangeReview();
+}
+function applyRange(){
+  for (const it of rangePlan.items) addAdj({ type:'cuti', staffId:rangePlan.staffId, date:it.date, coverage: it.off ? null : (it.cover||null) });
+  rangePlan=null; closeSheet(); render();
 }
 
 /* ---------------- Lembar: jadwalkan pelunasan hutang ---------------- */
@@ -525,8 +640,13 @@ document.addEventListener('click', e => {
   const ys=e.target.closest('[data-ystep]'); if(ys){ pickYear+=+ys.dataset.ystep; renderMonthPicker(); return; }
   const jm=e.target.closest('[data-jump]'); if(jm){ const [y,m]=jm.dataset.jump.split('.'); state.y=+y;state.m=+m; closeSheet(); render(); return; }
   const add=e.target.closest('[data-add]'); if(add){ openAdd(+add.dataset.add); return; }
+  const kd=e.target.closest('[data-kind]'); if(kd){ addCtx.kind=kd.dataset.kind; renderAddForm(); return; }
   if(e.target.closest('[data-addnext]')){ addNext(); return; }
   const cov=e.target.closest('[data-cover]'); if(cov){ applyCover(cov.dataset.cover); return; }
+  const rpk=e.target.closest('[data-rangepick]'); if(rpk){ renderRangePicker(+rpk.dataset.rangepick); return; }
+  if(e.target.closest('[data-rangeback]')){ renderRangeReview(); return; }
+  const rco=e.target.closest('[data-rangecover]'); if(rco){ setRangeCover(rco.dataset.rangecover); return; }
+  if(e.target.closest('[data-rangeapply]')){ applyRange(); return; }
   const del=e.target.closest('[data-deladj]'); if(del){ removeAdj(del.dataset.deladj); if(sheetEl().classList.contains('is-open')) closeSheet(); render(); return; }
   const cf=e.target.closest('[data-confirm]'); if(cf){ openRepay(cf.dataset.confirm); return; }
   const sr=e.target.closest('[data-setrepay]'); if(sr){ setRepay(sr.dataset.setrepay); return; }

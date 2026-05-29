@@ -29,7 +29,8 @@ Pengguna saat ini: **Fakhrul Aldia Nugraha, A.Md.Rad (Aldi)**.
 - Semua penyesuaian **tersimpan permanen** dan **tercermin** di Beranda, Kalender, dan detail tanggal.
 - Pilihan **"Biarkan kosong dulu"** untuk menunda penggantian — akan muncul sebagai konflik agar tak terlupa.
 
-> Cakupan slice ini: **cuti satu tanggal**. Rentang tanggal & input tukar/double manual menyusul.
+- **Cuti rentang tanggal**: pilih Dari–Sampai; pengganti tiap hari dipilih otomatis (Muhraini diutamakan), bisa diubah per hari di layar review sebelum diterapkan.
+- **Tukar shift** (dua orang bertukar) & **Double manual** (ambil shift tambahan) bisa diinput langsung lewat **Tambah penyesuaian → Jenis**.
 
 ---
 
@@ -86,7 +87,6 @@ Semua di `app.js`, bagian atas:
 
 ## 🛣️ Roadmap berikutnya
 
-- **Penyesuaian — lanjutan**: cuti rentang tanggal & input tukar/double shift manual.
 - **Simulasi** — tampilan tanggal / minggu / bulan ke masa depan.
 - **Ekspor hibrida** — **Excel** (format daftar jaga, untuk salin-tempel) + **JPG** (matriks tim dengan baris Aldi disorot, dan kalender pribadi).
 - **Statistik dinas** & catatan.
