@@ -1,47 +1,63 @@
-/* Shift Radiologi — service worker (offline-first, cache app shell) */
-const CACHE = 'shift-radiologi-v0.1.0';
-
-const SHELL = [
-  './',
-  './index.html',
-  './styles.css',
-  './app.js',
-  './manifest.json',
-  './icon.svg',
+/* Shift Radiologi — service worker (offline-first, tahan-banting)
+   - HTML/navigasi: network-first → selalu terbaru saat online, jatuh ke cache saat offline.
+   - Aset statis: cache-first → cepat & hemat.
+   - Instalasi pakai allSettled: satu aset hilang TIDAK membatalkan SW.
+   Naikkan CACHE tiap rilis untuk membersihkan cache lama. */
+const CACHE = 'shift-radiologi-v0.2.0';
+const CORE  = ['./', './index.html'];
+const EXTRA = [
+  './styles.css', './app.js', './manifest.json',
+  './icon-192.png', './icon-512.png', './icon-180.png', './icon-maskable-512.png',
 ];
 
-self.addEventListener('install', e => {
-  e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting()));
+self.addEventListener('install', (e) => {
+  e.waitUntil((async () => {
+    const c = await caches.open(CACHE);
+    await Promise.allSettled(CORE.map((u) => c.add(u)));
+    await Promise.allSettled(EXTRA.map((u) => c.add(u)));
+    await self.skipWaiting();
+  })());
 });
 
-self.addEventListener('activate', e => {
+self.addEventListener('activate', (e) => {
   e.waitUntil(
     caches.keys()
-      .then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k))))
+      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))))
       .then(() => self.clients.claim())
   );
 });
 
-/* Navigasi & shell: cache-first lalu jaringan.
-   Font Google (gstatic/googleapis): simpan salinan agar tetap muncul offline. */
-self.addEventListener('fetch', e => {
+self.addEventListener('fetch', (e) => {
   const req = e.request;
   if (req.method !== 'GET') return;
+  const isHTML = req.mode === 'navigate' ||
+    (req.headers.get('accept') || '').includes('text/html');
+
+  if (isHTML) {
+    e.respondWith(
+      fetch(req.url, { cache: 'no-store' })
+        .then((res) => {
+          const copy = res.clone();
+          caches.open(CACHE).then((c) => c.put('./index.html', copy)).catch(() => {});
+          return res;
+        })
+        .catch(() => caches.match(req).then((hit) => hit || caches.match('./index.html')))
+    );
+    return;
+  }
 
   e.respondWith(
-    caches.match(req).then(hit => {
+    caches.match(req).then((hit) => {
       if (hit) return hit;
-      return fetch(req).then(res => {
+      return fetch(req).then((res) => {
         const url = new URL(req.url);
-        const cacheable = url.origin === location.origin ||
-                          url.host.includes('fonts.googleapis.com') ||
-                          url.host.includes('fonts.gstatic.com');
-        if (cacheable && res.ok){
-          const copy = res.clone();
-          caches.open(CACHE).then(c => c.put(req, copy));
-        }
+        const ok = res && res.status === 200 &&
+          (url.origin === location.origin ||
+           url.host.includes('fonts.googleapis.com') ||
+           url.host.includes('fonts.gstatic.com'));
+        if (ok){ const copy = res.clone(); caches.open(CACHE).then((c) => c.put(req, copy)).catch(()=>{}); }
         return res;
-      }).catch(() => caches.match('./index.html'));
+      }).catch(() => hit);
     })
   );
 });
