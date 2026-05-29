@@ -24,7 +24,8 @@ Pengguna saat ini: **Fakhrul Aldia Nugraha, A.Md.Rad (Aldi)**.
 - **Pemilih pengganti berwarna** untuk rotator yang cuti, mengikuti aturan kita:
   - **Hijau** = ada celah istirahat (mis. Pagi+Malam) · **Oranye** = maraton, istirahat minim · **Merah** = tak bisa (Malam → langsung Pagi), otomatis dinonaktifkan.
   - Urutan: **Muhraini** (pengganti, tanpa hutang) → rekan **dari libur** → **double shift** → Muhraini sebagai **upaya terakhir** (jika sudah menutup yang lain).
-- **Double shift** mencatat **hutang dinas** (siapa berutang 1 shift ke siapa), bisa ditandai **lunas**.
+- **Double shift** mencatat **hutang dinas**. Di tab **Atur**, tekan **Konfirmasi** untuk menjadwalkan kapan si penghutang mengganti — pilih salah satu **dinas pemberi pinjaman** (bulan ini / depan; pilihan sadar-istirahat). Status otomatis **Dalam proses**, lalu **Lunas** begitu tanggalnya lewat. Tanggal pelunasan ikut tampil di Kalender.
+- **Absen** (SI-PASTI / SI-PALUI) berdampingan di atas Beranda untuk akses cepat.
 - Semua penyesuaian **tersimpan permanen** dan **tercermin** di Beranda, Kalender, dan detail tanggal.
 - Pilihan **"Biarkan kosong dulu"** untuk menunda penggantian — akan muncul sebagai konflik agar tak terlupa.
 

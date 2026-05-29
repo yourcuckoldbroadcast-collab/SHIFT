@@ -118,26 +118,34 @@ function resolveDay(date){
   const k = keyOf(date);
   const adjs = ADJ.filter(a=>a.date===k);
   const eff = {};
-  for (const s of STAFF) eff[s.id] = { base:baseShiftOf(s,date), cuti:false, covers:[] };
+  for (const s of STAFF) eff[s.id] = { base:baseShiftOf(s,date), cuti:false, covers:[], repayOff:false };
   for (const a of adjs){
     if (a.type==='cuti') eff[a.staffId].cuti = true;
     if (a.coverage) eff[a.coverage.covererId].covers.push(a.coverage);
+  }
+  // pelunasan hutang yang dijadwalkan pada tanggal ini: kreditur libur, debitur masuk gantikan
+  for (const d of ADJ){
+    if (d.coverage && d.coverage.debt && d.repay && d.repay.date===k){
+      eff[d.coverage.covererId].repayOff = true;
+      eff[d.staffId].covers.push({ shift:d.repay.shift, kind:'repay' });
+    }
   }
   const byShift = { P:[], S:[], M:[], L:[], C:[] };
   for (const s of STAFF){
     const e = eff[s.id];
     if (e.cuti){ byShift.C.push({ staff:s }); continue; }
+    const base = e.repayOff ? 'L' : e.base;
     const subRole = e.covers.some(c=>c.kind==='substitute'||c.kind==='double-akhir');
     const shifts = [];
-    if (!subRole && ['P','S','M'].includes(e.base)) shifts.push({ sh:e.base, tag:'base' });
+    if (!subRole && ['P','S','M'].includes(base)) shifts.push({ sh:base, tag:'base' });
     for (const c of e.covers) shifts.push({ sh:c.shift, tag:c.kind });
     const seen = {};
     const dbl = shifts.length>1;
     for (const it of shifts){
       if (seen[it.sh]) continue; seen[it.sh]=1;
-      byShift[it.sh].push({ staff:s, cover:it.tag!=='base', double:dbl && it.tag==='base' || (dbl && it.tag!=='base') });
+      byShift[it.sh].push({ staff:s, cover:it.tag!=='base', double:dbl, repay:it.tag==='repay' });
     }
-    if (!shifts.length) byShift.L.push({ staff:s }); // base libur, no cover
+    if (!shifts.length) byShift.L.push({ staff:s, repay:e.repayOff }); // libur (atau libur karena pelunasan)
   }
   const conflicts = [];
   for (const sh of ['P','S','M']) if (byShift[sh].length===0) conflicts.push(sh);
@@ -153,7 +161,7 @@ function userInfo(date){
   const dbl = shifts.length>1;
   return { state: dbl?'double':'work', shifts, primary:shifts[0], cls:SHIFT[shifts[0]].cls, dbl };
 }
-function dayHasAdj(date){ return ADJ.some(a=>a.date===keyOf(date)); }
+function dayHasAdj(date){ const k=keyOf(date); return ADJ.some(a=>a.date===k || (a.coverage&&a.coverage.debt&&a.repay&&a.repay.date===k)); }
 
 /* ---------------- Konflik global ---------------- */
 function allConflicts(){
@@ -163,6 +171,11 @@ function allConflicts(){
   return out;
 }
 function debtList(){ return ADJ.filter(a=>a.coverage && a.coverage.debt); }
+// status pelunasan: belum dijadwalkan / dalam proses (tanggal belum lewat) / lunas (tanggal sudah lewat)
+function debtStatus(d){
+  if (!d.repay) return { key:'belum', label:'Belum dijadwalkan' };
+  return (d.repay.date < keyOf(today)) ? { key:'lunas', label:'Lunas' } : { key:'proses', label:'Dalam proses' };
+}
 
 /* ---------------- State ---------------- */
 const today = new Date();
@@ -208,6 +221,7 @@ function renderBeranda(){
       <div class="hi__sub">${esc(USER.role)} · NIP ${esc(USER.nip)}</div></div>
   </header>
   <main class="page">
+    <div class="absen absen--top">${ABSEN.map(a=>`<a class="absen__btn" href="${a.url}" target="_blank" rel="noopener noreferrer"><span class="absen__label">${a.label}</span><span class="absen__go">↗</span></a>`).join('')}</div>
     <section class="hero hero--${cls}">
       <div class="hero__eyebrow"><span class="dot"></span>Shift hari ini</div>
       <div class="hero__date">${HARI[today.getDay()]}, ${today.getDate()} ${BULAN[today.getMonth()]} ${today.getFullYear()}</div>
@@ -222,10 +236,6 @@ function renderBeranda(){
       ${r.byShift.C.length?`<div class="restline restline--cuti">Cuti — ${r.byShift.C.map(x=>esc(x.staff.short)).join(', ')}</div>`:''}
       ${r.byShift.L.length?`<div class="restline">Libur — ${r.byShift.L.map(x=>esc(x.staff.short)).join(', ')}</div>`:''}
     </div>
-    ${sectionTitle('Lanjut absen')}
-    <p class="hint">Aplikasi terpisah dari sistem absensi — tombol membuka situsnya di tab baru.</p>
-    <div class="absen">${ABSEN.map(a=>`<a class="absen__btn" href="${a.url}" target="_blank" rel="noopener noreferrer">
-      <span class="absen__label">${a.label}</span><span class="absen__sub">${a.sub}</span><span class="absen__go">↗</span></a>`).join('')}</div>
   </main>`;
 }
 const greeting = h => h<11?'Selamat pagi':h<15?'Selamat siang':h<19?'Selamat sore':'Selamat malam';
@@ -295,12 +305,18 @@ function renderAtur(){
       <button class="adj__del" type="button" data-deladj="${a.id}" aria-label="Hapus">✕</button></div>`;
   }).join('') : `<div class="empty">Belum ada penyesuaian. Buka Kalender, ketuk tanggal, lalu "Tambah penyesuaian".</div>`;
 
-  const debtHTML = debts.length ? debts.map(a=>{
-    const ow=byId(a.staffId), cv=byId(a.coverage.covererId);
-    return `<div class="debt ${a.settled?'debt--done':''}">
-      <div class="debt__main"><div class="debt__txt"><b>${esc(ow.short)}</b> berutang 1 shift ke <b>${esc(cv.short)}</b></div>
-        <div class="debt__meta">sejak ${fmtKey(a.date)}${a.settled?' · lunas':''}</div></div>
-      <button class="debt__btn" type="button" data-debt="${a.id}">${a.settled?'Batalkan':'Lunas'}</button></div>`;
+  const debtHTML = debts.length ? debts.map(d=>{
+    const ow=byId(d.staffId), cv=byId(d.coverage.covererId), st=debtStatus(d);
+    const extra = d.repay ? ` · ${esc(ow.short)} ganti ${SHIFT[d.repay.shift].label} ${fmtKey(d.repay.date)}` : '';
+    const action = st.key==='belum'
+      ? `<button class="debt__btn" type="button" data-confirm="${d.id}">Konfirmasi</button>`
+      : `<button class="debt__btn debt__btn--ghost" type="button" data-confirm="${d.id}">Ubah</button>`;
+    return `<div class="debt debt--${st.key}">
+      <div class="debt__main">
+        <div class="debt__txt"><b>${esc(ow.short)}</b> berutang 1 shift ke <b>${esc(cv.short)}</b></div>
+        <div class="debt__meta">sejak ${fmtKey(d.date)}${extra}</div>
+        <span class="debt__status debt__status--${st.key}">${st.label}</span>
+      </div>${action}</div>`;
   }).join('') : `<div class="empty">Belum ada hutang dinas.</div>`;
 
   return `
@@ -408,9 +424,65 @@ function renderPicker(){
 }
 function applyCover(val){
   const [covererId, X, kind, color, debt] = val.split('|');
-  const adj = { type:'cuti', staffId:addCtx.staffId, date:keyOf(addCtx.date), coverage:null, settled:false };
+  const adj = { type:'cuti', staffId:addCtx.staffId, date:keyOf(addCtx.date), coverage:null };
   if (covererId) adj.coverage = { covererId, shift:X, kind, color, debt:debt==='1' };
   addAdj(adj);
+  closeSheet(); render();
+}
+
+/* ---------------- Lembar: jadwalkan pelunasan hutang ---------------- */
+function openRepay(debtId){
+  const d = findAdj(debtId);
+  if (!d || !d.coverage) return;
+  const ow = byId(d.staffId);            // debitur (mis. Humaidi)
+  const cv = byId(d.coverage.covererId); // kreditur (mis. Aldi)
+  const start = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const end   = new Date(today.getFullYear(), today.getMonth()+2, 0); // akhir bulan depan
+  const usedRepay = new Set(ADJ.filter(a=>a.repay && a.id!==debtId).map(a=>a.repay.date));
+  const months = {};
+  for (let dt=new Date(start); dt<=end; dt=addDays(dt,1)){
+    const sh = baseShiftOf(cv, dt);
+    if (!['P','S','M'].includes(sh)) continue;          // hanya hari kerja kreditur
+    const k = keyOf(dt);
+    if (dayHasAdj(dt) || usedRepay.has(k)) continue;     // hindari tanggal yg sudah dipakai
+    const hb = baseShiftOf(ow, dt);
+    let color, hint;
+    if (hb==='L'){ color='green'; hint=`${ow.short} libur — ideal`; }
+    else { color = restColor(ow, sh, dt); hint = color==='red' ? `${ow.short} tak bisa` : `${ow.short} double ${hb}+${sh}`; }
+    const mk = dt.getFullYear()+'-'+dt.getMonth();
+    if (!months[mk]) months[mk] = [];
+    months[mk].push({ k, sh, color, hint, dt:new Date(dt) });
+  }
+  const blocks = Object.keys(months).map(mk=>{
+    const mm = +mk.split('-')[1], yy = +mk.split('-')[0];
+    const rows = months[mk].map(o=>{
+      const dis = o.color==='red';
+      return `<button class="cand cand--${o.color}" type="button" ${dis?'disabled':`data-setrepay="${debtId}|${o.k}|${o.sh}"`}>
+        <span class="cand__dot"></span>
+        <span class="cand__body"><span class="cand__name">${HARI3[(o.dt.getDay()+6)%7]}, ${o.dt.getDate()} ${BULAN3[mm]} · ${SHIFT[o.sh].label}</span>
+          <span class="cand__how">${esc(o.hint)}</span></span></button>`;
+    }).join('');
+    return `<div class="repay__month">${BULAN[mm]} ${yy}</div>${rows}`;
+  }).join('');
+  sheetEl().innerHTML = `
+    <div class="sheet__card" role="dialog" aria-modal="true">
+      <div class="sheet__grab"></div>
+      <div class="sheet__head"><div><div class="sheet__eyebrow">Jadwalkan pelunasan</div>
+        <div class="sheet__date">${esc(ow.short)} ganti dinas ${esc(cv.short)}</div></div>
+        <button class="iconbtn" type="button" data-close>✕</button></div>
+      <p class="hint">Pilih dinas ${esc(cv.short)} yang diambil ${esc(ow.short)} — ${esc(cv.short)} libur, ${esc(ow.short)} masuk. Otomatis “Lunas” setelah tanggalnya lewat.</p>
+      <div class="cands">${blocks||'<div class="empty">Tidak ada tanggal cocok dalam 2 bulan ke depan.</div>'}</div>
+      ${d.repay?`<button class="bigbtn bigbtn--ghost" type="button" data-clearrepay="${debtId}">Hapus jadwal pelunasan</button>`:''}
+    </div>`;
+  sheetEl().classList.add('is-open');
+}
+function setRepay(val){
+  const [id, date, shift] = val.split('|');
+  const d = findAdj(id); if (d){ d.repay = { date, shift }; saveAdj(); }
+  closeSheet(); render();
+}
+function clearRepay(id){
+  const d = findAdj(id); if (d){ delete d.repay; saveAdj(); }
   closeSheet(); render();
 }
 
@@ -456,7 +528,9 @@ document.addEventListener('click', e => {
   if(e.target.closest('[data-addnext]')){ addNext(); return; }
   const cov=e.target.closest('[data-cover]'); if(cov){ applyCover(cov.dataset.cover); return; }
   const del=e.target.closest('[data-deladj]'); if(del){ removeAdj(del.dataset.deladj); if(sheetEl().classList.contains('is-open')) closeSheet(); render(); return; }
-  const dbt=e.target.closest('[data-debt]'); if(dbt){ const a=findAdj(dbt.dataset.debt); if(a){ a.settled=!a.settled; saveAdj(); } render(); return; }
+  const cf=e.target.closest('[data-confirm]'); if(cf){ openRepay(cf.dataset.confirm); return; }
+  const sr=e.target.closest('[data-setrepay]'); if(sr){ setRepay(sr.dataset.setrepay); return; }
+  const cr=e.target.closest('[data-clearrepay]'); if(cr){ clearRepay(cr.dataset.clearrepay); return; }
   const day=e.target.closest('[data-day]'); if(day){ openDay(+day.dataset.day); return; }
   if(e.target.closest('[data-close]')||e.target.id==='sheet'){ closeSheet(); }
 });
