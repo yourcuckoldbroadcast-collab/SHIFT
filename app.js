@@ -31,9 +31,23 @@ const SHIFT = {
 };
 
 const HOLIDAYS = {
-  '2026-01-01':'Tahun Baru Masehi', '2026-05-01':'Hari Buruh',
-  '2026-06-01':'Hari Lahir Pancasila', '2026-08-17':'Hari Kemerdekaan RI', '2026-12-25':'Hari Natal',
+  // 2026 — resmi (SKB 3 Menteri / Setneg)
+  '2026-01-01':'Tahun Baru Masehi', '2026-01-16':'Isra Mikraj Nabi Muhammad',
+  '2026-02-17':'Tahun Baru Imlek 2577', '2026-03-19':'Hari Suci Nyepi',
+  '2026-03-21':'Idul Fitri 1447 H', '2026-03-22':'Idul Fitri 1447 H (hari ke-2)',
+  '2026-04-03':'Wafat Yesus Kristus', '2026-04-05':'Paskah',
+  '2026-05-01':'Hari Buruh', '2026-05-14':'Kenaikan Yesus Kristus',
+  '2026-05-27':'Idul Adha 1447 H', '2026-05-31':'Hari Raya Waisak 2570 BE',
+  '2026-06-01':'Hari Lahir Pancasila', '2026-06-16':'Tahun Baru Islam 1448 H',
+  '2026-08-17':'Hari Kemerdekaan RI', '2026-08-25':'Maulid Nabi Muhammad',
+  '2026-12-25':'Hari Raya Natal',
+  // 2027 — tanggal tetap pasti; tanggal hijriah masih perkiraan (lihat HOLIDAY_EST)
+  '2027-01-01':'Tahun Baru Masehi',
+  '2027-03-10':'Idul Fitri 1448 H', '2027-05-16':'Idul Adha 1448 H',
+  '2027-08-17':'Hari Kemerdekaan RI', '2027-12-25':'Hari Raya Natal',
 };
+// tanggal hijriah 2027 — perkiraan, menunggu SKB resmi pemerintah
+const HOLIDAY_EST = new Set(['2027-03-10','2027-05-16']);
 const ABSEN = [
   { label:'SI-PASTI', sub:'Absen utama',    url:'https://pasti.seruyankab.go.id/' },
   { label:'SI-PALUI', sub:'Absen cadangan', url:'https://palui.seruyankab.go.id/' },
@@ -617,18 +631,87 @@ function renderMonthPicker(){
   sheetEl().classList.add('is-open');
 }
 
+/* ---------------- Simulasi (proyeksi masa depan) ---------------- */
+let simDate = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+let simScroll = false;
+function teammates(date, sh){ return resolveDay(date).byShift[sh].filter(x=>!x.staff.isUser).map(x=>x.staff.short); }
+const shiftCodeOf  = my => my.state==='cuti'?'C':my.state==='libur'?'L':my.primary;
+const shiftClsOf   = my => my.state==='cuti'?'cuti':(my.cls||'libur');
+const shiftLabelOf = my => my.state==='cuti'?'Cuti':my.state==='libur'?'Libur':my.shifts.map(s=>SHIFT[s].label).join(' + ');
+const dlabelFull   = k => { const d=fromKey(k); return `${HARI[d.getDay()]}, ${d.getDate()} ${BULAN[d.getMonth()]} ${d.getFullYear()}`; };
+
+function ritmeStrip(n){
+  let cells='';
+  for (let i=0;i<n;i++){
+    const dt=addDays(today,i), my=userInfo(dt), hol=holiday(dt);
+    cells += `<button class="rday${i===0?' rday--today':''}" type="button" data-simdate="${keyOf(dt)}">
+      <span class="rday__w">${HARI3[(dt.getDay()+6)%7]}</span>
+      <span class="rday__d">${dt.getDate()}</span>
+      <span class="rday__p rday__p--${shiftClsOf(my)}">${shiftCodeOf(my)}</span>
+      ${my.dbl?'<span class="rday__x">2×</span>':(hol?'<span class="rday__h" title="tanggal merah">•</span>':'')}</button>`;
+  }
+  return `<div class="ritme">${cells}</div>`;
+}
+function cekResult(date){
+  const my=userInfo(date), hol=holiday(date);
+  const head = `<div class="simr__date">${dlabelFull(keyOf(date))}</div>${hol?`<div class="simr__hol">Tanggal merah · ${esc(hol)}</div>`:''}`;
+  let body;
+  if (my.state==='cuti') body = `<div class="simr__big simr__big--cuti">Cuti</div>`;
+  else if (my.state==='libur') body = `<div class="simr__big simr__big--libur">Libur</div><div class="simr__sub">Tidak ada jadwal dinas — selamat berlibur.</div>`;
+  else {
+    const blocks = my.shifts.map(sh=>{
+      const tm = teammates(date, sh);
+      return `<div class="simr__shift">
+        <span class="simr__pill simr__pill--${SHIFT[sh].cls}">${SHIFT[sh].label}</span>
+        <span class="simr__time">${SHIFT[sh].time}</span>
+        <div class="simr__team">${tm.length?('Bersama '+tm.map(esc).join(', ')):'Sendiri di sif ini'}</div></div>`;
+    }).join('');
+    body = `${my.dbl?'<div class="simr__note">Dinas ganda (double)</div>':''}${blocks}`;
+  }
+  return `<div class="simr" id="simResult">${head}${body}</div>`;
+}
+function hariBesarList(){
+  const tk=keyOf(today);
+  const up = Object.keys(HOLIDAYS).filter(k=>k>=tk).sort().slice(0,10);
+  if (!up.length) return '<div class="empty">Tidak ada hari besar mendatang dalam data.</div>';
+  return up.map(k=>{
+    const dt=fromKey(k), my=userInfo(dt), est=HOLIDAY_EST.has(k);
+    return `<button class="hbig" type="button" data-simdate="${k}">
+      <div class="hbig__l"><div class="hbig__n">${esc(HOLIDAYS[k])}${est?' <span class="hbig__est">perkiraan</span>':''}</div>
+        <div class="hbig__d">${dlabelShort(k)} ${dt.getFullYear()}</div></div>
+      <span class="hbig__p hbig__p--${shiftClsOf(my)}">${shiftLabelOf(my)}</span></button>`;
+  }).join('');
+}
+function renderSimulasi(){
+  return `
+  <header class="topbar topbar--cal"><div class="topbar__row"><h1 class="cal__title">Simulasi</h1></div>
+    <div class="cal__sub">Proyeksi jadwal ${esc(USER.short)} ke depan · mengikuti pola shift otomatis</div>
+  </header>
+  <main class="page">
+    ${sectionTitle('Ritme 2 minggu ke depan')}
+    ${ritmeStrip(14)}
+    ${sectionTitle('Cek tanggal')}
+    <div class="field"><input id="simInput" class="input" type="date" value="${keyOf(simDate)}"></div>
+    ${cekResult(simDate)}
+    ${sectionTitle('Hari besar mendatang')}
+    <div class="hbigs">${hariBesarList()}</div>
+    <p class="hint" style="margin-top:10px">Tanggal hari raya 2027 masih <b>perkiraan</b> — tanggal resmi menyusul lewat SKB pemerintah. Ketuk hari mana pun untuk lihat detailnya.</p>
+  </main>`;
+}
+
 /* ---------------- Nav + mount ---------------- */
-const NAV = [{id:'beranda',label:'Beranda',icon:'⌂'},{id:'kalender',label:'Kalender',icon:'▦'},{id:'atur',label:'Atur',icon:'⚙'}];
+const NAV = [{id:'beranda',label:'Beranda',icon:'⌂'},{id:'kalender',label:'Kalender',icon:'▦'},{id:'simulasi',label:'Simulasi',icon:'◷'},{id:'atur',label:'Atur',icon:'⚙'}];
 function renderNav(){
   const badge = (allConflicts().length)? '<span class="tab__badge"></span>':'';
-  return `<nav class="tabbar tabbar--3">${NAV.map(n=>`<button type="button" class="tab ${state.view===n.id?'tab--on':''}" data-view="${n.id}">
+  return `<nav class="tabbar tabbar--4">${NAV.map(n=>`<button type="button" class="tab ${state.view===n.id?'tab--on':''}" data-view="${n.id}">
     <span class="tab__icon">${n.icon}${n.id==='atur'?badge:''}</span><span class="tab__label">${n.label}</span></button>`).join('')}</nav>`;
 }
 function render(){
   const v = document.getElementById('view');
-  v.innerHTML = state.view==='beranda'?renderBeranda():state.view==='kalender'?renderKalender():renderAtur();
+  v.innerHTML = state.view==='beranda'?renderBeranda():state.view==='kalender'?renderKalender():state.view==='simulasi'?renderSimulasi():renderAtur();
   document.getElementById('nav').innerHTML = renderNav();
-  window.scrollTo({top:0});
+  if(simScroll){ simScroll=false; requestAnimationFrame(()=>{ const r=document.getElementById('simResult'); if(r) r.scrollIntoView({behavior:'smooth',block:'center'}); }); }
+  else window.scrollTo({top:0});
 }
 
 /* ---------------- Events ---------------- */
@@ -652,8 +735,10 @@ document.addEventListener('click', e => {
   const sr=e.target.closest('[data-setrepay]'); if(sr){ setRepay(sr.dataset.setrepay); return; }
   const cr=e.target.closest('[data-clearrepay]'); if(cr){ clearRepay(cr.dataset.clearrepay); return; }
   const day=e.target.closest('[data-day]'); if(day){ openDay(+day.dataset.day); return; }
+  const sd=e.target.closest('[data-simdate]'); if(sd){ simDate=fromKey(sd.dataset.simdate); simScroll=true; render(); return; }
   if(e.target.closest('[data-close]')||e.target.id==='sheet'){ closeSheet(); }
 });
+document.addEventListener('change', e=>{ if(e.target.id==='simInput'){ simDate=fromKey(e.target.value); simScroll=true; render(); } });
 document.addEventListener('keydown', e=>{ if(e.key==='Escape') closeSheet(); });
 
 render();
