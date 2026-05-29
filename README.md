@@ -17,6 +17,21 @@ Pengguna saat ini: **Fakhrul Aldia Nugraha, A.Md.Rad (Aldi)**.
 
 ---
 
+## ✅ Penyesuaian jadwal (v0.3)
+
+- **Tab "Atur"** baru: daftar penyesuaian aktif, **arsip hutang dinas**, dan panel **konflik** (shift kosong).
+- **Input cuti**: ketuk tanggal di Kalender → **Tambah penyesuaian** → pilih petugas.
+- **Pemilih pengganti berwarna** untuk rotator yang cuti, mengikuti aturan kita:
+  - **Hijau** = ada celah istirahat (mis. Pagi+Malam) · **Oranye** = maraton, istirahat minim · **Merah** = tak bisa (Malam → langsung Pagi), otomatis dinonaktifkan.
+  - Urutan: **Muhraini** (pengganti, tanpa hutang) → rekan **dari libur** → **double shift** → Muhraini sebagai **upaya terakhir** (jika sudah menutup yang lain).
+- **Double shift** mencatat **hutang dinas** (siapa berutang 1 shift ke siapa), bisa ditandai **lunas**.
+- Semua penyesuaian **tersimpan permanen** dan **tercermin** di Beranda, Kalender, dan detail tanggal.
+- Pilihan **"Biarkan kosong dulu"** untuk menunda penggantian — akan muncul sebagai konflik agar tak terlupa.
+
+> Cakupan slice ini: **cuti satu tanggal**. Rentang tanggal & input tukar/double manual menyusul.
+
+---
+
 ## 🧠 Model engine (ringkas)
 
 **Dua kelas petugas:**
@@ -26,7 +41,7 @@ Pengguna saat ini: **Fakhrul Aldia Nugraha, A.Md.Rad (Aldi)**.
 | Rotator | Didit, Humaidi, Aldi, Luthfi | Siklus 8 hari: **P P · S S · M M · L L**, masing-masing digeser fase 2 hari → tiap hari selalu ada 1 Pagi, 1 Sore, 1 Malam, 1 Libur |
 | Cadangan | dr. Dina, Anisa, Muhraini, Ano | **Pagi** di hari kerja, **Libur** tiap Minggu + tanggal merah |
 
-**Jadwal = pola dasar (deterministik) + penyesuaian (menyusul).** Pola dasar diproyeksikan dari satu titik jangkar (1 Mei 2026), jadi "tanggal X tahun Y aku shift apa" cukup dihitung, bukan ditebak.
+**Jadwal = pola dasar (deterministik) + penyesuaian.** Pola dasar diproyeksikan dari satu titik jangkar (1 Mei 2026), jadi "tanggal X tahun Y aku shift apa" cukup dihitung, bukan ditebak.
 
 ---
 
@@ -49,11 +64,12 @@ python3 -m http.server 8080
 
 ```
 index.html      kerangka halaman + pemuatan font/gaya
-styles.css      tema terang-fungsional + sistem warna shift
-app.js          ENGINE (pola dasar) + render Beranda & Kalender
+styles.css      tema gelap premium + sistem warna shift
+app.js          ENGINE + mesin pengganti + render Beranda / Kalender / Atur
 manifest.json   metadata PWA
 sw.js           service worker (cache untuk offline)
-icon.svg        ikon aplikasi
+icon-*.png      ikon aplikasi (192 / 512 / 180 / maskable)
+logo-source.png logo asli (arsip)
 ```
 
 ## ⚙️ Menyesuaikan data
@@ -67,8 +83,7 @@ Semua di `app.js`, bagian atas:
 
 ## 🛣️ Roadmap berikutnya
 
-- **Penyesuaian jadwal** — cuti, petugas pengganti (Muhraini), double shift, dengan **arsip hutang dinas**.
-- **Deteksi konflik berwarna** — hijau (direkomendasikan) / oranye (maraton, istirahat minim) / merah (tidak bisa, mis. Malam → langsung Pagi), termasuk pertimbangan beban Muhraini.
+- **Penyesuaian — lanjutan**: cuti rentang tanggal & input tukar/double shift manual.
 - **Simulasi** — tampilan tanggal / minggu / bulan ke masa depan.
 - **Ekspor hibrida** — **Excel** (format daftar jaga, untuk salin-tempel) + **JPG** (matriks tim dengan baris Aldi disorot, dan kalender pribadi).
 - **Statistik dinas** & catatan.

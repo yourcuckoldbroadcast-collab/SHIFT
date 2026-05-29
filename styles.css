@@ -15,6 +15,7 @@
   --sore:#5aa9e6;  --sore-bg:rgba(90,169,230,.13);  --sore-fg:#aed6f5;
   --malam:#9590ec; --malam-bg:rgba(149,144,236,.15); --malam-fg:#cac6f6;
   --libur:#9aa48f; --libur-bg:rgba(154,164,143,.10); --libur-fg:#c5cdba;
+  --cuti:#e08a6f;  --cuti-bg:rgba(224,138,111,.15);  --cuti-fg:#f2b79e;
 
   --radius:20px;
   --shadow:0 18px 50px -22px rgba(0,0,0,.85);
@@ -182,3 +183,90 @@ strong,b{ font-weight:600; }
 .pick__m:active{ transform:scale(.95); }
 .pick__m--now{ border-color:var(--line); color:var(--cream); }
 .pick__m--on{ background:linear-gradient(160deg,var(--green),var(--green-deep)); color:#0c1206; border-color:transparent; font-weight:700; }
+
+/* ===== v0.3 — penyesuaian: cuti, pengganti berwarna, hutang, konflik ===== */
+
+/* varian cuti */
+.hero--cuti{ --glow:rgba(224,138,111,.16); }
+.hero--cuti .hero__shift{ color:var(--cuti-fg); }
+.grp--cuti .grp__dot{ background:var(--cuti); box-shadow:0 0 9px var(--cuti); }
+.chip--cuti{ color:var(--cuti-fg); border-color:rgba(224,138,111,.30); background:var(--cuti-bg); }
+.cell--cuti{ background:var(--cuti-bg); }
+.cell--cuti .cell__num,.cell--cuti .cell__sh{ color:var(--cuti-fg); }
+.sheet__me--cuti{ background:var(--cuti-bg); } .sheet__me--cuti .sheet__me-v{ color:var(--cuti-fg); }
+.restline--cuti{ color:var(--cuti-fg); }
+
+/* mini-tag pada chip (ganti / double) */
+.chip__tag{ margin-left:6px; font-size:8.5px; font-weight:700; letter-spacing:.12em; text-transform:uppercase; opacity:.7; vertical-align:middle; }
+
+/* titik penanda penyesuaian di sel kalender */
+.cell{ position:relative; }
+.cell__adj{ position:absolute; top:5px; right:5px; width:6px; height:6px; border-radius:50%; background:var(--cuti); box-shadow:0 0 6px var(--cuti); }
+.cell--today .cell__adj{ background:#0c1206; box-shadow:none; }
+
+/* tabbar 3 kolom + badge konflik */
+.tabbar--3{ grid-template-columns:1fr 1fr 1fr; }
+.tab__icon{ position:relative; }
+.tab__badge{ position:absolute; top:-3px; right:-7px; width:7px; height:7px; border-radius:50%; background:var(--danger); box-shadow:0 0 7px var(--danger); }
+
+/* tombol besar dalam sheet */
+.bigbtn{ width:100%; margin-top:16px; padding:15px; border-radius:14px; background:linear-gradient(160deg,var(--green),var(--green-deep)); color:#0c1206; font-family:var(--sans); font-size:15px; font-weight:700; box-shadow:0 14px 30px -14px var(--green); }
+.bigbtn:active{ transform:translateY(1px); }
+.bigbtn--ghost{ margin-top:10px; background:transparent; color:var(--muted); border:1px solid var(--line-soft); box-shadow:none; font-weight:600; }
+
+/* field form */
+.field{ margin-top:16px; }
+.field>label{ display:block; font-size:11px; font-weight:600; letter-spacing:.18em; text-transform:uppercase; color:var(--muted); margin-bottom:8px; }
+.select{ width:100%; padding:13px 14px; border-radius:13px; background:var(--surface-2); border:1px solid var(--line-soft); color:var(--cream); font-family:var(--sans); font-size:14px; appearance:none; -webkit-appearance:none; background-image:linear-gradient(45deg,transparent 50%,var(--muted) 50%),linear-gradient(135deg,var(--muted) 50%,transparent 50%); background-position:calc(100% - 18px) 19px,calc(100% - 13px) 19px; background-size:5px 5px,5px 5px; background-repeat:no-repeat; }
+.seg{ display:flex; gap:8px; }
+.seg__b{ flex:1; padding:11px; border-radius:11px; border:1px solid var(--line-soft); background:var(--surface-2); color:var(--muted); font-size:13px; font-weight:600; }
+.seg__b--on{ background:var(--green-soft); border-color:var(--line); color:var(--green-hi); }
+
+/* pemilih pengganti berwarna */
+.cands{ display:flex; flex-direction:column; gap:9px; margin-top:6px; }
+.cand{ display:flex; align-items:center; gap:12px; width:100%; text-align:left; padding:13px 14px; border-radius:14px; border:1px solid var(--line-soft); background:var(--surface); }
+.cand:active{ transform:translateY(1px); }
+.cand[disabled]{ opacity:.45; cursor:not-allowed; }
+.cand__dot{ width:10px; height:10px; border-radius:50%; flex:none; }
+.cand--green{ border-color:rgba(132,207,18,.28); } .cand--green .cand__dot{ background:var(--green); box-shadow:0 0 9px var(--green); }
+.cand--orange{ border-color:rgba(227,173,62,.30); } .cand--orange .cand__dot{ background:#e6b450; box-shadow:0 0 9px rgba(227,173,62,.7); }
+.cand--red .cand__dot{ background:var(--danger); }
+.cand__body{ flex:1; display:flex; flex-direction:column; gap:1px; }
+.cand__name{ font-size:14.5px; font-weight:600; color:var(--cream); }
+.cand__how{ font-size:12px; color:var(--muted); }
+.cand__badge{ font-size:10px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; padding:4px 9px; border-radius:999px; flex:none; }
+.cand__badge--green{ color:var(--green-hi); background:var(--green-soft); }
+.cand__badge--orange{ color:#f1cd86; background:rgba(227,173,62,.12); }
+.cand__badge--red{ color:var(--danger); background:rgba(217,143,106,.12); }
+
+/* panel konflik */
+.panel{ border-radius:16px; padding:15px 16px; border:1px solid var(--line-soft); }
+.panel--warn{ background:rgba(217,143,106,.10); border-color:rgba(217,143,106,.3); }
+.panel--ok{ background:var(--green-soft); border-color:var(--line); }
+.panel__h{ font-size:14px; font-weight:700; }
+.panel--warn .panel__h{ color:var(--cuti-fg); } .panel--ok .panel__h{ color:var(--green-hi); }
+.panel__sub{ font-size:12.5px; color:var(--muted); margin-top:4px; }
+.panel__row{ font-size:13px; color:var(--cream-2); margin-top:7px; padding-left:2px; }
+
+/* daftar penyesuaian & hutang */
+.list{ display:flex; flex-direction:column; gap:9px; }
+.empty{ font-size:13px; color:var(--muted); padding:16px; text-align:center; border:1px dashed var(--line-soft); border-radius:14px; line-height:1.5; }
+.adj{ display:flex; align-items:center; gap:10px; padding:13px 14px; border-radius:14px; background:var(--surface); border:1px solid var(--line-soft); }
+.adj--sm{ padding:10px 12px; background:var(--surface-2); }
+.adj__main{ flex:1; min-width:0; }
+.adj__name{ font-size:14px; font-weight:600; color:var(--cream); }
+.adj__meta{ font-size:12px; color:var(--muted); margin-top:2px; }
+.adj__del{ width:30px; height:30px; border-radius:9px; color:var(--muted); font-size:13px; flex:none; border:1px solid var(--line-soft); }
+.adj__del:active{ background:rgba(217,143,106,.12); color:var(--danger); }
+.sheet__adjs{ display:flex; flex-direction:column; gap:7px; margin-top:12px; }
+
+.debt{ display:flex; align-items:center; gap:10px; padding:13px 14px; border-radius:14px; background:var(--surface); border:1px solid var(--line-soft); }
+.debt--done{ opacity:.55; }
+.debt__main{ flex:1; min-width:0; }
+.debt__txt{ font-size:13.5px; color:var(--cream); }
+.debt__meta{ font-size:11.5px; color:var(--muted); margin-top:2px; }
+.debt__btn{ padding:8px 13px; border-radius:10px; font-size:12px; font-weight:700; border:1px solid var(--line); background:var(--green-soft); color:var(--green-hi); flex:none; }
+.debt--done .debt__btn{ background:var(--surface-2); border-color:var(--line-soft); color:var(--muted); }
+
+/* peringatan konflik di sheet detail */
+.sheet__warn{ margin:12px 0; padding:11px 14px; border-radius:12px; font-size:13px; font-weight:600; color:var(--cuti-fg); background:rgba(217,143,106,.1); border:1px solid rgba(217,143,106,.3); }
