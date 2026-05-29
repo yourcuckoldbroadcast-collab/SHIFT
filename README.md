@@ -63,13 +63,15 @@ python3 -m http.server 8080
 ## 🗂️ Struktur
 
 ```
-index.html      kerangka halaman + pemuatan font/gaya
-styles.css      tema gelap premium + sistem warna shift
-app.js          ENGINE + mesin pengganti + render Beranda / Kalender / Atur
-manifest.json   metadata PWA
-sw.js           service worker (cache untuk offline)
-icon-*.png      ikon aplikasi (192 / 512 / 180 / maskable)
-logo-source.png logo asli (arsip)
+index.html           kerangka halaman + pemuatan font/gaya
+styles.css           tema terang putih–biru pastel (gaya office) + sistem warna shift
+app.js               ENGINE + mesin pengganti + render Beranda / Kalender / Atur
+manifest.webmanifest metadata PWA
+sw.js                service worker (cache untuk offline)
+favicon.svg          lambang trefoil (digambar di kode) — favicon & dasar lambang header
+icon-192/512.png     ikon launcher (dari logo)   ·   icon-maskable.png (adaptif Android)
+apple-touch-icon.png ikon iOS   ·   favicon-64.png (fallback tab)
+logo-source.png      logo SHIFT (arsip)
 ```
 
 ## ⚙️ Menyesuaikan data

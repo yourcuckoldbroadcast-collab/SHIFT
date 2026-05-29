@@ -3,11 +3,12 @@
    - Aset statis: cache-first → cepat & hemat.
    - Instalasi pakai allSettled: satu aset hilang TIDAK membatalkan SW.
    Naikkan CACHE tiap rilis untuk membersihkan cache lama. */
-const CACHE = 'shift-radiologi-v0.3.0';
+const CACHE = 'shift-radiologi-v0.4.0';
 const CORE  = ['./', './index.html'];
 const EXTRA = [
-  './styles.css', './app.js', './manifest.json',
-  './icon-192.png', './icon-512.png', './icon-180.png', './icon-maskable-512.png',
+  './styles.css', './app.js', './manifest.webmanifest',
+  './icon-192.png', './icon-512.png', './icon-maskable.png',
+  './apple-touch-icon.png', './favicon.svg', './favicon-64.png',
 ];
 
 self.addEventListener('install', (e) => {
