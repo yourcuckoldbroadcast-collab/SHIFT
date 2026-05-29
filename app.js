@@ -182,6 +182,15 @@ function userInfo(date){
   return { state: dbl?'double':'work', shifts, primary:shifts[0], cls:SHIFT[shifts[0]].cls, dbl };
 }
 function dayHasAdj(date){ const k=keyOf(date); return ADJ.some(a=>a.date===k || (a.coverage&&a.coverage.debt&&a.repay&&a.repay.date===k)); }
+// Fase shift pengguna: hari ke-n dari total hari blok shift yang sama (siklus 2-harian → 1/2 atau 2/2)
+function cyclePhase(date){
+  if (USER.type!=='rotator') return null;
+  const base = baseShiftOf(USER, date);
+  let back=0, fwd=0;
+  for (let i=1;i<8;i++){ if (baseShiftOf(USER, addDays(date,-i))===base) back++; else break; }
+  for (let i=1;i<8;i++){ if (baseShiftOf(USER, addDays(date, i))===base) fwd++;  else break; }
+  return { n:back+1, total:back+1+fwd, base };
+}
 
 /* ---------------- Konflik global ---------------- */
 function allConflicts(){
@@ -218,17 +227,65 @@ function shiftGroup(key, list){
 }
 const sectionTitle = (t,extra='') => `<div class="section-title">${t}${extra}</div>`;
 
+/* ---------------- Konteks kartu hero Beranda ---------------- */
+// Penyesuaian yang menyentuh pengguna pada tanggal ini (untuk menjelaskan "kenapa")
+function userAdjToday(date){
+  const k=keyOf(date), me=USER.id;
+  for (const a of ADJ){
+    if (a.coverage && a.coverage.debt && a.repay && a.repay.date===k){
+      if (a.coverage.covererId===me) return { kind:'repay-credit', byId:a.staffId };
+      if (a.staffId===me)            return { kind:'repay-debt', toId:a.coverage.covererId, shift:a.repay.shift };
+    }
+  }
+  for (const a of ADJ){
+    if (a.date!==k) continue;
+    if (a.type==='cuti'){
+      if (a.staffId===me) return { kind:'cuti' };
+      if (a.coverage && a.coverage.covererId===me) return { kind:a.coverage.kind, forId:a.staffId, shift:a.coverage.shift };
+    } else if (a.type==='double' && a.staffId===me){
+      return { kind:'double-manual', shift:a.shift };
+    } else if (a.type==='swap' && (a.aId===me||a.bId===me)){
+      return { kind:'swap', withId:a.aId===me?a.bId:a.aId };
+    }
+  }
+  return null;
+}
+// Kata besar + warna + catatan untuk kartu hero (fase & alasan ada di catatan)
+function heroState(date){
+  const ui=userInfo(date), base=baseShiftOf(USER,date), ctx=userAdjToday(date);
+  const nm=id=>esc(byId(id).short), tm=sh=>SHIFT[sh].time;
+  const out=(code,note)=>({ big:code==='L'?'Libur':code==='C'?'Cuti':SHIFT[code].label,
+    cls:code==='L'?'libur':code==='C'?'cuti':SHIFT[code].cls, note });
+
+  if (ui.state==='cuti') return out('C','Kamu mengambil cuti hari ini.');
+  if (ctx){
+    if (ctx.kind==='repay-credit') return out('L', `Dibayar ${nm(ctx.byId)} — harusnya kamu dinas ${SHIFT[base].label}.`);
+    if (ctx.kind==='repay-debt')   return out(ctx.shift, `Bayar dinas ${nm(ctx.toId)} · ${tm(ctx.shift)}`);
+    if (ctx.kind==='swap'){ const c=ui.state==='libur'?'L':ui.primary;
+      return out(c, `Tukar shift dengan ${nm(ctx.withId)}${c==='L'?' (kamu jadi libur)':` · ${tm(ui.primary)}`}`); }
+    if (ctx.kind==='libur'||ctx.kind==='substitute'){ const who=base==='L'?`${nm(ctx.forId)} (hari liburmu)`:nm(ctx.forId);
+      return out(ui.primary, `Menggantikan ${who} · ${tm(ui.primary)}`); }
+    if (ctx.kind==='double'){ const extra=ui.shifts.find(s=>s!==base) ?? ui.shifts[1];
+      return out(base, `Double menutup ${nm(ctx.forId)} · ${SHIFT[base].label} + ${SHIFT[extra].label}`); }
+    if (ctx.kind==='double-manual'){
+      if (ui.state==='double'){ const extra=ui.shifts.find(s=>s!==base) ?? ui.shifts[1];
+        return out(base, `Double shift · ${SHIFT[base].label} + ${SHIFT[extra].label}`); }
+      return out(ui.primary, `Dinas tambahan di luar jadwal · ${tm(ui.primary)}`);
+    }
+  }
+  // hari dinas default (murni siklus) → fase ditulis di deskripsi
+  const ph=cyclePhase(date);
+  let besok=''; if (ph && ph.n===ph.total){ const nb=baseShiftOf(USER,addDays(date,1)); besok=nb==='L'?' · besok libur':` · besok ${SHIFT[nb].label}`; }
+  if (ui.state==='libur') return out('L', ph ? `Hari libur ke-${ph.n} dari ${ph.total}${besok || ' · selamat beristirahat'}` : 'Tidak ada jadwal hari ini — selamat beristirahat');
+  return out(ui.primary, ph ? `Bertugas pukul ${tm(ui.primary)} · hari ke-${ph.n} dari ${ph.total}${besok}` : `Bertugas pukul ${tm(ui.primary)}`);
+}
+
 /* ---------------- Beranda ---------------- */
 function renderBeranda(){
-  const ui = userInfo(today);
-  const cls = ui.state==='cuti' ? 'cuti' : (ui.cls||'libur');
+  const hs = heroState(today);
+  const cls = hs.cls;
   const r = resolveDay(today);
   const hol = holiday(today);
-  let bigword, note;
-  if (ui.state==='cuti'){ bigword='Cuti'; note='Kamu mengambil cuti hari ini.'; }
-  else if (ui.state==='libur'){ bigword='Libur'; note='Tidak ada jadwal hari ini — selamat beristirahat.'; }
-  else if (ui.state==='double'){ bigword=SHIFT[ui.shifts[0]].label; note=`Double shift: ${ui.shifts.map(s=>SHIFT[s].label).join(' + ')}.`; }
-  else { bigword=SHIFT[ui.primary].label; note=`Bertugas pukul ${SHIFT[ui.primary].time}.`; }
 
   return `
   <header class="topbar">
@@ -246,9 +303,9 @@ function renderBeranda(){
       <div class="hero__eyebrow"><span class="dot"></span>Shift hari ini</div>
       <div class="hero__date">${HARI[today.getDay()]}, ${today.getDate()} ${BULAN[today.getMonth()]} ${today.getFullYear()}</div>
       ${hol?`<div class="hero__flag">Tanggal merah · ${esc(hol)}</div>`:''}
-      <div class="hero__shift">${bigword}</div>
+      <div class="hero__shift">${hs.big}</div>
       <div class="hero__rule"></div>
-      <div class="hero__note">${note}</div>
+      <div class="hero__note">${hs.note}</div>
     </section>
     ${sectionTitle('Bertugas hari ini')}
     <div class="stack">

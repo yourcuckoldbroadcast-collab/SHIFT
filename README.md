@@ -93,6 +93,11 @@ Semua di `app.js`, bagian atas:
 - **`STAFF`** — daftar petugas. Untuk rotator, `phase` = indeks dalam siklus pada 1 Mei 2026 (Didit 0, Aldi 2, Luthfi 4, Humaidi 6).
 - **`HOLIDAYS`** — tanggal merah nasional (memengaruhi libur petugas cadangan). Tambah/sinkronkan di sini.
 - **`SHIFT`** — label & jam tiap shift.
+- **`USER_PHOTO`** — foto profil di kartu Beranda. Isi URL atau path (mis. `'./foto.jpg'` bila file ada di repo); kosongkan untuk pakai inisial nama otomatis.
+
+Kartu Beranda memusatkan semua info pada baris deskripsi (tanpa avatar):
+- **Hari dinas default** → "Bertugas pukul … · hari ke-1 dari 2", dengan "· besok …" di hari terakhir blok shift 2-harian.
+- **Saat ada penyesuaian** → deskripsi menjelaskan alasannya, mis. "Menggantikan Humaidi (hari liburmu)", "Double menutup Luthfi · Pagi + Sore", "Tukar shift dengan Didit", atau "Dibayar Luthfi — harusnya kamu dinas Sore" (pelunasan).
 
 ---
 
