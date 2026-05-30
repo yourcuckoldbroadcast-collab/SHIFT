@@ -1,4 +1,4 @@
-# Shift Radiologi
+# SHIFT-RAD
 
 Aplikasi jadwal shift **Instalasi Radiologi** — ringan, visual, dan **offline-first** (PWA). Berdiri sendiri, terpisah dari sistem absensi institusi.
 
@@ -27,6 +27,7 @@ Pengguna saat ini: **Fakhrul Aldia Nugraha, A.Md.Rad (Aldi)**.
 - **Double shift** mencatat **hutang dinas**. Di tab **Atur**, tekan **Konfirmasi** untuk menjadwalkan kapan si penghutang mengganti — pilih salah satu **dinas pemberi pinjaman** (bulan ini / depan; pilihan sadar-istirahat). Status otomatis **Dalam proses**, lalu **Lunas** begitu tanggalnya lewat. Tanggal pelunasan ikut tampil di Kalender.
 - **Absen** (SI-PASTI / SI-PALUI) berdampingan di atas Beranda untuk akses cepat.
 - Semua penyesuaian **tersimpan permanen** dan **tercermin** di Beranda, Kalender, dan detail tanggal.
+- **Hari libur instansi (manual)** — di **Atur** bisa menambah tanggal libur di luar libur nasional, dengan pilihan cakupan: **Semua petugas** (rotator & cadangan ikut libur — instansi tutup) atau **Hanya dinas pagi** (rotator tetap menjalankan shift, hanya petugas pagi/cadangan libur). Otomatis tercermin sebagai tanggal merah di Kalender, detail tanggal, & Simulasi.
 - Pilihan **"Biarkan kosong dulu"** untuk menunda penggantian — akan muncul sebagai konflik agar tak terlupa.
 
 - **Cuti rentang tanggal**: pilih Dari–Sampai; pengganti tiap hari dipilih otomatis (Muhraini diutamakan), bisa diubah per hari di layar review sebelum diterapkan.
@@ -93,11 +94,10 @@ Semua di `app.js`, bagian atas:
 - **`STAFF`** — daftar petugas. Untuk rotator, `phase` = indeks dalam siklus pada 1 Mei 2026 (Didit 0, Aldi 2, Luthfi 4, Humaidi 6).
 - **`HOLIDAYS`** — tanggal merah nasional (memengaruhi libur petugas cadangan). Tambah/sinkronkan di sini.
 - **`SHIFT`** — label & jam tiap shift.
-- **`USER_PHOTO`** — foto profil di kartu Beranda. Isi URL atau path (mis. `'./foto.jpg'` bila file ada di repo); kosongkan untuk pakai inisial nama otomatis.
 
-Kartu Beranda memusatkan semua info pada baris deskripsi (tanpa avatar):
-- **Hari dinas default** → "Bertugas pukul … · hari ke-1 dari 2", dengan "· besok …" di hari terakhir blok shift 2-harian.
-- **Saat ada penyesuaian** → deskripsi menjelaskan alasannya, mis. "Menggantikan Humaidi (hari liburmu)", "Double menutup Luthfi · Pagi + Sore", "Tukar shift dengan Didit", atau "Dibayar Luthfi — harusnya kamu dinas Sore" (pelunasan).
+Kartu **Shift hari ini** tampil premium (gradasi putih→biru pastel) dengan susunan: label besar shift, chip fase (**KE-1/KE-2** atau penanda penyesuaian seperti **GANTI/DOUBLE/TUKAR/PELUNASAN**), tanggal, jam dinas, dan **blok quote informatif**:
+- **Hari default** → quote diambil dari acuan fase (mis. Pagi ke-2: "Hari kedua shift Pagi. Setelah menyelesaikan tugas hari ini, besok Anda beralih ke shift Sore.").
+- **Saat ada penyesuaian** → quote menjelaskan alasannya (menggantikan / double / tukar / pelunasan / dibayar), lengkap dengan jam bila relevan.
 
 ---
 

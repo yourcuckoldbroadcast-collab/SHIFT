@@ -1,6 +1,6 @@
 {
-  "name": "Shift Radiologi",
-  "short_name": "Shift",
+  "name": "SHIFT-RAD",
+  "short_name": "SHIFT-RAD",
   "description": "Jadwal shift Instalasi Radiologi — aplikasi mandiri, offline-first.",
   "start_url": "./",
   "scope": "./",

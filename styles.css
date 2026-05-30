@@ -40,7 +40,7 @@ strong,b{ font-weight:700; }
 .topbar__row{ display:flex; align-items:center; justify-content:space-between; gap:12px; }
 .brand{ display:flex; align-items:center; gap:11px; }
 .brand__mark{ width:32px; height:32px; flex:none; filter:drop-shadow(0 2px 5px rgba(0,0,0,.18)); }
-.brand__name{ font-weight:800; font-size:18px; letter-spacing:.01em; }
+.brand__name{ font-weight:800; font-size:19px; letter-spacing:.08em; }
 .iconbtn{ width:38px; height:38px; border-radius:12px; background:rgba(255,255,255,.18); color:#fff;
   font-size:15px; display:flex; align-items:center; justify-content:center; }
 .iconbtn[disabled]{ opacity:.5; }
@@ -60,8 +60,9 @@ strong,b{ font-weight:700; }
 .section-title::after{ content:""; flex:1; height:1px; background:var(--line); }
 .hint{ font-size:12px; color:var(--muted); margin:-4px 0 12px; }
 
-/* ---------- hero: kartu hari ini ---------- */
-.hero{ position:relative; background:var(--surface); border-radius:var(--radius); padding:20px;
+/* ---------- hero: kartu hari ini (premium) ---------- */
+.hero{ position:relative; border-radius:var(--radius); padding:20px 20px 22px;
+  background:linear-gradient(160deg,#ffffff 0%,#f3f7ff 58%,#e9f0ff 100%);
   box-shadow:var(--shadow); border:1px solid var(--line-soft); margin-top:4px; overflow:hidden; }
 .hero::before{ content:""; position:absolute; left:0; top:0; bottom:0; width:5px; background:var(--accent,var(--blue)); }
 .hero--pagi{ --accent:var(--pagi); } .hero--sore{ --accent:var(--sore); }
@@ -69,12 +70,18 @@ strong,b{ font-weight:700; }
 .hero__eyebrow{ display:flex; align-items:center; gap:8px; font-size:10.5px; font-weight:700;
   letter-spacing:.18em; text-transform:uppercase; color:var(--blue); }
 .hero__eyebrow .dot{ width:7px; height:7px; border-radius:50%; background:var(--accent,var(--blue)); }
-.hero__date{ font-size:15px; font-weight:600; color:var(--ink-2); margin-top:12px; }
-.hero__flag{ font-size:11.5px; color:var(--cuti-fg); font-weight:600; margin-top:4px; }
-.hero__shift{ font-size:38px; font-weight:800; line-height:1.05; color:var(--accent,var(--blue));
-  margin-top:6px; letter-spacing:-.01em; }
-.hero__rule{ height:1px; background:var(--line); margin:16px 0; }
-.hero__note{ font-size:13.5px; color:var(--ink-2); }
+.hero__main{ display:flex; align-items:center; gap:11px; margin-top:14px; flex-wrap:wrap; }
+.hero__shift{ font-size:40px; font-weight:800; line-height:1; color:var(--accent,var(--blue)); letter-spacing:-.02em; }
+.hero__chip{ font-size:10.5px; font-weight:800; letter-spacing:.1em; color:#fff; background:var(--accent,var(--blue));
+  padding:4px 10px; border-radius:999px; box-shadow:0 3px 9px -3px var(--accent,var(--blue)); }
+.hero__sub{ font-size:11px; font-weight:700; letter-spacing:.12em; color:var(--muted); margin-top:9px; text-transform:uppercase; }
+.hero__flag{ font-size:11.5px; color:var(--cuti-fg); font-weight:600; margin-top:5px; }
+.hero__rule{ height:1px; background:linear-gradient(90deg,var(--line),transparent); margin:15px 0 13px; }
+.hero__time{ font-size:22px; font-weight:800; color:var(--ink); letter-spacing:-.01em; margin-bottom:13px; }
+.hero__quote{ position:relative; background:rgba(110,168,246,.10); border:1px solid rgba(110,168,246,.18);
+  border-radius:14px; padding:13px 15px 13px 40px; font-size:13.5px; line-height:1.5; font-style:italic; color:var(--ink-2); }
+.hero__qmark{ position:absolute; left:12px; top:3px; font-size:36px; font-weight:800; font-style:normal;
+  color:var(--accent,var(--blue)); opacity:.45; line-height:1; }
 
 /* ---------- grup shift + chip ---------- */
 .stack{ display:flex; flex-direction:column; gap:10px; }
@@ -177,6 +184,7 @@ strong,b{ font-weight:700; }
 .sheet__me--libur{ background:var(--libur-bg); } .sheet__me--libur .sheet__me-v{ color:var(--libur-fg); }
 .sheet__me--cuti{ background:var(--cuti-bg); } .sheet__me--cuti .sheet__me-v{ color:var(--cuti-fg); }
 .sheet__warn{ margin:12px 0; padding:11px 14px; border-radius:12px; font-size:13px; font-weight:600; color:var(--cuti-fg); background:var(--cuti-bg); }
+.sheet__info{ margin:12px 0; padding:11px 14px; border-radius:12px; font-size:13px; font-weight:600; color:var(--libur-fg,#5b6470); background:rgba(124,134,150,.12); }
 .sheet__body{ display:flex; flex-direction:column; gap:10px; }
 .sheet__adjs{ display:flex; flex-direction:column; gap:7px; margin-top:12px; }
 

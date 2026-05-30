@@ -48,6 +48,15 @@ const HOLIDAYS = {
 };
 // tanggal hijriah 2027 — perkiraan, menunggu SKB resmi pemerintah
 const HOLIDAY_EST = new Set(['2027-03-10','2027-05-16']);
+
+/* Hari libur instansi (manual) — fallback bila instansi menetapkan libur di luar nasional.
+   scope: 'all' = semua petugas libur (rotator + cadangan); 'pagi' = hanya petugas dinas pagi/cadangan. */
+const HOL_KEY = 'shift-radiologi-holidays-v1';
+function loadHol(){ try{ return JSON.parse(localStorage.getItem(HOL_KEY))||[]; }catch(e){ return []; } }
+function saveHol(){ try{ localStorage.setItem(HOL_KEY, JSON.stringify(HOL_USER)); }catch(e){} }
+let HOL_USER = loadHol();
+function addHol(h){ HOL_USER = HOL_USER.filter(x=>x.date!==h.date); HOL_USER.push(h); HOL_USER.sort((a,b)=>a.date<b.date?-1:1); saveHol(); }
+function removeHol(date){ HOL_USER = HOL_USER.filter(h=>h.date!==date); saveHol(); }
 const ABSEN = [
   { label:'SI-PASTI', sub:'Absen utama',    url:'https://pasti.seruyankab.go.id/' },
   { label:'SI-PALUI', sub:'Absen cadangan', url:'https://palui.seruyankab.go.id/' },
@@ -66,13 +75,23 @@ const keyOf  = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate()
 const fromKey= k => { const [y,m,da]=k.split('-').map(Number); return new Date(y,m-1,da); };
 const addDays= (d,n)=> new Date(d.getFullYear(),d.getMonth(),d.getDate()+n);
 const isSun  = d => d.getDay()===0;
-const holiday= d => HOLIDAYS[keyOf(d)]||null;
+// Info libur pada tanggal: nasional (cakupan 'pagi' = hanya cadangan) atau instansi (cakupan tersimpan)
+function holidayInfo(d){ const k=keyOf(d);
+  if (HOLIDAYS[k]) return { name:HOLIDAYS[k], scope:'pagi', source:'national' };
+  const u = HOL_USER.find(h=>h.date===k); if (u) return { name:u.name, scope:u.scope||'pagi', source:'user' };
+  return null;
+}
+const holiday= d => { const h=holidayInfo(d); return h?h.name:null; };
 const sameDay= (a,b)=> a.getFullYear()===b.getFullYear()&&a.getMonth()===b.getMonth()&&a.getDate()===b.getDate();
 const esc    = s => String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
 function baseShiftOf(s, d){
-  if (s.type==='rotator') return CYCLE[(((s.phase+dayNo(d))%8)+8)%8];
-  return (isSun(d)||holiday(d)) ? 'L' : 'P';
+  const h = holidayInfo(d);
+  if (s.type==='rotator'){
+    if (h && h.scope==='all') return 'L';            // libur instansi menyeluruh → rotator ikut libur
+    return CYCLE[(((s.phase+dayNo(d))%8)+8)%8];
+  }
+  return (isSun(d)||h) ? 'L' : 'P';                  // cadangan/dinas pagi libur tiap Minggu & semua tanggal merah
 }
 
 /* ---------------- Penyimpanan penyesuaian ---------------- */
@@ -211,6 +230,7 @@ const today = new Date();
 const state = { view:'beranda', y:today.getFullYear(), m:today.getMonth() };
 let pickYear = state.y;
 let addCtx = null; // {date, staffId} saat memilih pengganti
+let holScope = 'all'; // cakupan saat menambah hari libur instansi
 
 /* ---------------- Komponen ---------------- */
 function chip(staff, key, item){
@@ -250,34 +270,49 @@ function userAdjToday(date){
   }
   return null;
 }
-// Kata besar + warna + catatan untuk kartu hero (fase & alasan ada di catatan)
+// Teks acuan informatif tiap fase shift default (dipakai sebagai quote di kartu Beranda)
+const ACUAN = {
+  P1:'Hari pertama shift Pagi. Besok Anda masih melanjutkan tugas pada jam yang sama.',
+  P2:'Hari kedua shift Pagi. Setelah menyelesaikan tugas hari ini, besok Anda beralih ke shift Sore.',
+  S1:'Hari pertama shift Sore. Besok Anda masih bertugas pada periode yang sama.',
+  S2:'Hari kedua shift Sore. Siklus kerja berlanjut ke shift Malam mulai besok.',
+  M1:'Hari pertama shift Malam. Besok Anda masih menjalani dinas pada periode ini.',
+  M2:'Hari kedua shift Malam. Setelah malam ini selesai, waktunya beristirahat mulai besok.',
+  L1:'Hari pertama masa istirahat. Nikmati jeda yang ada, besok Anda masih memiliki satu hari libur lagi.',
+  L2:'Hari kedua masa istirahat. Semoga waktu jeda ini cukup menyegarkan, karena besok shift Pagi kembali dimulai.',
+};
+// Kartu hero Beranda: { big, cls, chip, time, quote }
 function heroState(date){
   const ui=userInfo(date), base=baseShiftOf(USER,date), ctx=userAdjToday(date);
   const nm=id=>esc(byId(id).short), tm=sh=>SHIFT[sh].time;
-  const out=(code,note)=>({ big:code==='L'?'Libur':code==='C'?'Cuti':SHIFT[code].label,
-    cls:code==='L'?'libur':code==='C'?'cuti':SHIFT[code].cls, note });
+  const mk=(code,o={})=>({ big:code==='L'?'Libur':code==='C'?'Cuti':SHIFT[code].label,
+    cls:code==='L'?'libur':code==='C'?'cuti':SHIFT[code].cls, chip:o.chip||null, time:o.time||null, quote:o.quote||'' });
 
-  if (ui.state==='cuti') return out('C','Kamu mengambil cuti hari ini.');
+  if (ui.state==='cuti') return mk('C', { quote:'Anda mengambil cuti hari ini. Selamat beristirahat dan pulihkan tenaga.' });
   if (ctx){
-    if (ctx.kind==='repay-credit') return out('L', `Dibayar ${nm(ctx.byId)} — harusnya kamu dinas ${SHIFT[base].label}.`);
-    if (ctx.kind==='repay-debt')   return out(ctx.shift, `Bayar dinas ${nm(ctx.toId)} · ${tm(ctx.shift)}`);
+    if (ctx.kind==='repay-credit') return mk('L', { chip:'DIBAYAR',
+      quote:`Hari ini ${nm(ctx.byId)} menggantikan dinas Anda sebagai pelunasan. Seharusnya Anda bertugas ${SHIFT[base].label}, tetapi cukup beristirahat.` });
+    if (ctx.kind==='repay-debt')   return mk(ctx.shift, { chip:'PELUNASAN', time:tm(ctx.shift),
+      quote:`Anda membayar dinas ${nm(ctx.toId)} hari ini — pelunasan dari double shift sebelumnya.` });
     if (ctx.kind==='swap'){ const c=ui.state==='libur'?'L':ui.primary;
-      return out(c, `Tukar shift dengan ${nm(ctx.withId)}${c==='L'?' (kamu jadi libur)':` · ${tm(ui.primary)}`}`); }
-    if (ctx.kind==='libur'||ctx.kind==='substitute'){ const who=base==='L'?`${nm(ctx.forId)} (hari liburmu)`:nm(ctx.forId);
-      return out(ui.primary, `Menggantikan ${who} · ${tm(ui.primary)}`); }
+      return mk(c, { chip:'TUKAR', time:c==='L'?null:tm(ui.primary), quote:`Anda bertukar shift dengan ${nm(ctx.withId)} pada hari ini.` }); }
+    if (ctx.kind==='libur'||ctx.kind==='substitute'){ const extra=base==='L'?' Sebenarnya hari ini jadwal libur Anda — terima kasih sudah membantu.':'';
+      return mk(ui.primary, { chip:'GANTI', time:tm(ui.primary), quote:`Anda menggantikan ${nm(ctx.forId)} pada shift ini.${extra}` }); }
     if (ctx.kind==='double'){ const extra=ui.shifts.find(s=>s!==base) ?? ui.shifts[1];
-      return out(base, `Double menutup ${nm(ctx.forId)} · ${SHIFT[base].label} + ${SHIFT[extra].label}`); }
+      return mk(base, { chip:'DOUBLE', quote:`Dinas ganda menutup ${nm(ctx.forId)}: ${SHIFT[base].label} (${tm(base)}) lalu ${SHIFT[extra].label} (${tm(extra)}).` }); }
     if (ctx.kind==='double-manual'){
       if (ui.state==='double'){ const extra=ui.shifts.find(s=>s!==base) ?? ui.shifts[1];
-        return out(base, `Double shift · ${SHIFT[base].label} + ${SHIFT[extra].label}`); }
-      return out(ui.primary, `Dinas tambahan di luar jadwal · ${tm(ui.primary)}`);
+        return mk(base, { chip:'DOUBLE', quote:`Dinas ganda hari ini: ${SHIFT[base].label} (${tm(base)}) lalu ${SHIFT[extra].label} (${tm(extra)}).` }); }
+      return mk(ui.primary, { chip:'EKSTRA', time:tm(ui.primary), quote:'Dinas tambahan di luar pola jadwal pada hari ini.' });
     }
   }
-  // hari dinas default (murni siklus) → fase ditulis di deskripsi
+  // hari dinas default (murni siklus) → quote dari ACUAN, chip "KE-n"
   const ph=cyclePhase(date);
-  let besok=''; if (ph && ph.n===ph.total){ const nb=baseShiftOf(USER,addDays(date,1)); besok=nb==='L'?' · besok libur':` · besok ${SHIFT[nb].label}`; }
-  if (ui.state==='libur') return out('L', ph ? `Hari libur ke-${ph.n} dari ${ph.total}${besok || ' · selamat beristirahat'}` : 'Tidak ada jadwal hari ini — selamat beristirahat');
-  return out(ui.primary, ph ? `Bertugas pukul ${tm(ui.primary)} · hari ke-${ph.n} dari ${ph.total}${besok}` : `Bertugas pukul ${tm(ui.primary)}`);
+  const n = ph ? ph.n : 1;
+  const key = (ui.state==='libur'?'L':base) + n;
+  const chip = ph ? `KE-${ph.n}` : null;
+  if (ui.state==='libur') return mk('L', { chip, quote:ACUAN[key]||'Hari libur — selamat beristirahat.' });
+  return mk(ui.primary, { chip, time:tm(ui.primary), quote:ACUAN[key]||`Bertugas pukul ${tm(ui.primary)}.` });
 }
 
 /* ---------------- Beranda ---------------- */
@@ -290,8 +325,7 @@ function renderBeranda(){
   return `
   <header class="topbar">
     <div class="topbar__row">
-      <div class="brand"><svg class="brand__mark" viewBox="0 0 100 100" aria-hidden="true"><g fill="#ffffff"><circle cx="50" cy="50" r="10.5"/><polygon points="71.50,12.76 67.49,10.72 63.29,9.10 58.94,7.94 54.49,7.24 50.00,7.00 45.51,7.24 41.06,7.94 36.71,9.10 32.51,10.72 28.50,12.76 41.00,34.41 42.68,33.56 44.44,32.88 46.26,32.39 48.12,32.10 50.00,32.00 51.88,32.10 53.74,32.39 55.56,32.88 57.32,33.56 59.00,34.41"/><polygon points="7.00,50.00 7.24,54.49 7.94,58.94 9.10,63.29 10.72,67.49 12.76,71.50 15.21,75.27 18.04,78.77 21.23,81.96 24.73,84.79 28.50,87.24 41.00,65.59 39.42,64.56 37.96,63.38 36.62,62.04 35.44,60.58 34.41,59.00 33.56,57.32 32.88,55.56 32.39,53.74 32.10,51.88 32.00,50.00"/><polygon points="71.50,87.24 75.27,84.79 78.77,81.96 81.96,78.77 84.79,75.27 87.24,71.50 89.28,67.49 90.90,63.29 92.06,58.94 92.76,54.49 93.00,50.00 68.00,50.00 67.90,51.88 67.61,53.74 67.12,55.56 66.44,57.32 65.59,59.00 64.56,60.58 63.38,62.04 62.04,63.38 60.58,64.56 59.00,65.59"/></g></svg><span class="brand__name">Shift Radiologi</span></div>
-      <button class="iconbtn" type="button" aria-label="Pengaturan" disabled>•••</button>
+      <div class="brand"><svg class="brand__mark" viewBox="0 0 100 100" aria-hidden="true"><g fill="#ffffff"><circle cx="50" cy="50" r="10.5"/><polygon points="71.50,12.76 67.49,10.72 63.29,9.10 58.94,7.94 54.49,7.24 50.00,7.00 45.51,7.24 41.06,7.94 36.71,9.10 32.51,10.72 28.50,12.76 41.00,34.41 42.68,33.56 44.44,32.88 46.26,32.39 48.12,32.10 50.00,32.00 51.88,32.10 53.74,32.39 55.56,32.88 57.32,33.56 59.00,34.41"/><polygon points="7.00,50.00 7.24,54.49 7.94,58.94 9.10,63.29 10.72,67.49 12.76,71.50 15.21,75.27 18.04,78.77 21.23,81.96 24.73,84.79 28.50,87.24 41.00,65.59 39.42,64.56 37.96,63.38 36.62,62.04 35.44,60.58 34.41,59.00 33.56,57.32 32.88,55.56 32.39,53.74 32.10,51.88 32.00,50.00"/><polygon points="71.50,87.24 75.27,84.79 78.77,81.96 81.96,78.77 84.79,75.27 87.24,71.50 89.28,67.49 90.90,63.29 92.06,58.94 92.76,54.49 93.00,50.00 68.00,50.00 67.90,51.88 67.61,53.74 67.12,55.56 66.44,57.32 65.59,59.00 64.56,60.58 63.38,62.04 62.04,63.38 60.58,64.56 59.00,65.59"/></g></svg><span class="brand__name">SHIFT-RAD</span></div>
     </div>
     <div class="hi"><div class="hi__greet">${greeting(today.getHours())},</div>
       <div class="hi__name">${esc(USER.short)}</div>
@@ -301,11 +335,12 @@ function renderBeranda(){
     <div class="absen absen--top">${ABSEN.map(a=>`<a class="absen__btn" href="${a.url}" target="_blank" rel="noopener noreferrer"><span class="absen__label">${a.label}</span><span class="absen__go">↗</span></a>`).join('')}</div>
     <section class="hero hero--${cls}">
       <div class="hero__eyebrow"><span class="dot"></span>Shift hari ini</div>
-      <div class="hero__date">${HARI[today.getDay()]}, ${today.getDate()} ${BULAN[today.getMonth()]} ${today.getFullYear()}</div>
+      <div class="hero__main"><div class="hero__shift">${hs.big}</div>${hs.chip?`<span class="hero__chip">${hs.chip}</span>`:''}</div>
+      <div class="hero__sub">${HARI[today.getDay()].toUpperCase()} · ${today.getDate()} ${BULAN[today.getMonth()].toUpperCase()} ${today.getFullYear()}</div>
       ${hol?`<div class="hero__flag">Tanggal merah · ${esc(hol)}</div>`:''}
-      <div class="hero__shift">${hs.big}</div>
       <div class="hero__rule"></div>
-      <div class="hero__note">${hs.note}</div>
+      ${hs.time?`<div class="hero__time">${hs.time}</div>`:''}
+      <div class="hero__quote"><span class="hero__qmark">“</span>${hs.quote}</div>
     </section>
     ${sectionTitle('Bertugas hari ini')}
     <div class="stack">
@@ -403,18 +438,56 @@ function renderAtur(){
       </div>${action}</div>`;
   }).join('') : `<div class="empty">Belum ada hutang dinas.</div>`;
 
+  const holHTML = HOL_USER.length ? HOL_USER.map(h=>`<div class="adj">
+      <div class="adj__main"><div class="adj__name">${esc(h.name)}</div>
+        <div class="adj__meta">${fmtKey(h.date)} · ${h.scope==='all'?'Semua petugas libur':'Hanya petugas dinas pagi'}</div></div>
+      <button class="adj__del" type="button" data-delhol="${h.date}" aria-label="Hapus">✕</button></div>`).join('')
+    : `<div class="empty">Belum ada hari libur instansi. Tambahkan bila instansi menetapkan libur di luar tanggal merah nasional.</div>`;
+
   return `
   <header class="topbar topbar--cal"><div class="topbar__row"><h1 class="cal__title">Atur</h1></div>
-    <div class="cal__sub">Penyesuaian, hutang dinas & konflik</div></header>
+    <div class="cal__sub">Penyesuaian, hari libur instansi, hutang dinas & konflik</div></header>
   <main class="page">
     ${conflictHTML}
     ${sectionTitle('Penyesuaian aktif')}
     <div class="list">${adjHTML}</div>
+    ${sectionTitle('Hari libur instansi')}
+    <div class="list">${holHTML}</div>
+    <button class="bigbtn bigbtn--ghost" type="button" data-addhol>+ Tambah hari libur instansi</button>
     ${sectionTitle('Arsip hutang dinas')}
     <div class="list">${debtHTML}</div>
   </main>`;
 }
 const fmtKey = k => { const d=fromKey(k); return `${d.getDate()} ${BULAN3[d.getMonth()]} ${d.getFullYear()}`; };
+
+/* ---------------- Lembar: tambah hari libur instansi ---------------- */
+function openHolForm(){
+  holScope = 'all';
+  sheetEl().innerHTML = `
+    <div class="sheet__card" role="dialog" aria-modal="true">
+      <div class="sheet__grab"></div>
+      <div class="sheet__head"><div><div class="sheet__eyebrow">Hari libur instansi</div>
+        <div class="sheet__date">Tambah tanggal libur</div></div>
+        <button class="iconbtn" type="button" data-close>✕</button></div>
+      <div class="field"><label>Nama libur</label><input id="holName" class="input" type="text" placeholder="mis. HUT Instansi, Cuti Bersama Lokal"></div>
+      <div class="field"><label>Tanggal</label><input id="holDate" class="input" type="date" value="${keyOf(today)}"></div>
+      <div class="field"><label>Berlaku untuk</label>
+        <div class="seg seg--hol">
+          <button class="seg__b seg__b--on" type="button" data-holscope="all">Semua petugas</button>
+          <button class="seg__b" type="button" data-holscope="pagi">Hanya dinas pagi</button>
+        </div>
+        <p class="hint">“Semua petugas” → rotator & cadangan ikut libur (instansi tutup). “Hanya dinas pagi” → hanya petugas pagi/cadangan libur, rotator tetap menjalankan shift.</p></div>
+      <button class="bigbtn" type="button" data-savehol>Simpan hari libur</button>
+    </div>`;
+  sheetEl().classList.add('is-open');
+}
+function saveHolForm(){
+  const name = (document.getElementById('holName').value||'').trim() || 'Libur instansi';
+  const date = document.getElementById('holDate').value;
+  if (!date) return;
+  addHol({ date, name, scope: holScope||'all' });
+  closeSheet(); render();
+}
 
 /* ---------------- Lembar: detail tanggal ---------------- */
 const sheetEl = () => document.getElementById('sheet');
@@ -422,6 +495,7 @@ function closeSheet(){ sheetEl().classList.remove('is-open'); addCtx=null; }
 
 function openDay(d){
   const date=new Date(state.y,state.m,d), r=resolveDay(date), hol=holiday(date);
+  const closed = (holidayInfo(date)||{}).scope==='all';
   const my = userInfo(date);
   const myLabel = my.state==='cuti'?'Cuti':my.state==='libur'?'Libur':my.shifts.map(s=>SHIFT[s].label).join(' + ');
   const myCls = my.state==='cuti'?'cuti':(my.cls||'libur');
@@ -440,7 +514,9 @@ function openDay(d){
         ${hol?`<div class="sheet__flag">Tanggal merah · ${esc(hol)}</div>`:''}</div>
         <button class="iconbtn" type="button" data-close>✕</button></div>
       <div class="sheet__me sheet__me--${myCls}"><span class="sheet__me-k">Kamu</span><span class="sheet__me-v">${myLabel}</span></div>
-      ${r.conflicts.length?`<div class="sheet__warn">⚠ ${r.conflicts.map(s=>SHIFT[s].label).join(', ')} belum ada petugas</div>`:''}
+      ${r.conflicts.length ? (closed
+        ? `<div class="sheet__info">Instansi libur — seluruh petugas off hari ini.</div>`
+        : `<div class="sheet__warn">⚠ ${r.conflicts.map(s=>SHIFT[s].label).join(', ')} belum ada petugas</div>`) : ''}
       <div class="sheet__body">
         ${shiftGroup('P',r.byShift.P)}${shiftGroup('S',r.byShift.S)}${shiftGroup('M',r.byShift.M)}${shiftGroup('L',r.byShift.L)}${shiftGroup('C',r.byShift.C)}
       </div>
@@ -781,6 +857,11 @@ document.addEventListener('click', e => {
   const jm=e.target.closest('[data-jump]'); if(jm){ const [y,m]=jm.dataset.jump.split('.'); state.y=+y;state.m=+m; closeSheet(); render(); return; }
   const add=e.target.closest('[data-add]'); if(add){ openAdd(+add.dataset.add); return; }
   const kd=e.target.closest('[data-kind]'); if(kd){ addCtx.kind=kd.dataset.kind; renderAddForm(); return; }
+  if(e.target.closest('[data-addhol]')){ openHolForm(); return; }
+  if(e.target.closest('[data-savehol]')){ saveHolForm(); return; }
+  const hsc=e.target.closest('[data-holscope]'); if(hsc){ holScope=hsc.dataset.holscope;
+    sheetEl().querySelectorAll('.seg--hol .seg__b').forEach(b=>b.classList.toggle('seg__b--on', b.dataset.holscope===holScope)); return; }
+  const dh=e.target.closest('[data-delhol]'); if(dh){ removeHol(dh.dataset.delhol); render(); return; }
   if(e.target.closest('[data-addnext]')){ addNext(); return; }
   const cov=e.target.closest('[data-cover]'); if(cov){ applyCover(cov.dataset.cover); return; }
   const rpk=e.target.closest('[data-rangepick]'); if(rpk){ renderRangePicker(+rpk.dataset.rangepick); return; }
