@@ -57,6 +57,30 @@ function saveHol(){ try{ localStorage.setItem(HOL_KEY, JSON.stringify(HOL_USER))
 let HOL_USER = loadHol();
 function addHol(h){ HOL_USER = HOL_USER.filter(x=>x.date!==h.date); HOL_USER.push(h); HOL_USER.sort((a,b)=>a.date<b.date?-1:1); saveHol(); }
 function removeHol(date){ HOL_USER = HOL_USER.filter(h=>h.date!==date); saveHol(); }
+
+/* Foto profil pengguna — dipilih dari galeri/berkas, dikecilkan & disimpan di localStorage (dataURL). */
+const PHOTO_KEY = 'shift-radiologi-photo-v1';
+function loadPhoto(){ try{ return localStorage.getItem(PHOTO_KEY)||null; }catch(e){ return null; } }
+let PHOTO = loadPhoto();
+function savePhoto(v){ try{ localStorage.setItem(PHOTO_KEY, v); PHOTO=v; return true; }catch(e){ return false; } }
+function clearPhoto(){ try{ localStorage.removeItem(PHOTO_KEY); }catch(e){} PHOTO=null; }
+// kecilkan & potong-tengah ke kotak SxS, ekspor JPEG ringan
+function shrinkPhoto(file, cb){
+  const img=new Image(), url=URL.createObjectURL(file);
+  img.onload=()=>{ const S=256, c=document.createElement('canvas'); c.width=S; c.height=S;
+    const x=c.getContext('2d'); const sc=Math.max(S/img.width,S/img.height);
+    const w=img.width*sc, h=img.height*sc; x.drawImage(img,(S-w)/2,(S-h)/2,w,h);
+    URL.revokeObjectURL(url); cb(c.toDataURL('image/jpeg',0.82)); };
+  img.onerror=()=>{ URL.revokeObjectURL(url); };
+  img.src=url;
+}
+// buka pemilih berkas (galeri / file manager) lalu simpan
+function pickPhoto(){
+  const inp=document.createElement('input'); inp.type='file'; inp.accept='image/*';
+  inp.addEventListener('change',()=>{ const f=inp.files&&inp.files[0]; if(!f) return;
+    shrinkPhoto(f, data=>{ savePhoto(data); render(); }); });
+  inp.click();
+}
 const ABSEN = [
   { label:'SI-PASTI', sub:'Absen utama',    url:'https://pasti.seruyankab.go.id/' },
   { label:'SI-PALUI', sub:'Absen cadangan', url:'https://palui.seruyankab.go.id/' },
@@ -324,12 +348,24 @@ function renderBeranda(){
 
   return `
   <header class="topbar">
-    <div class="topbar__row">
-      <div class="brand"><svg class="brand__mark" viewBox="0 0 100 100" aria-hidden="true"><g fill="#ffffff"><circle cx="50" cy="50" r="10.5"/><polygon points="71.50,12.76 67.49,10.72 63.29,9.10 58.94,7.94 54.49,7.24 50.00,7.00 45.51,7.24 41.06,7.94 36.71,9.10 32.51,10.72 28.50,12.76 41.00,34.41 42.68,33.56 44.44,32.88 46.26,32.39 48.12,32.10 50.00,32.00 51.88,32.10 53.74,32.39 55.56,32.88 57.32,33.56 59.00,34.41"/><polygon points="7.00,50.00 7.24,54.49 7.94,58.94 9.10,63.29 10.72,67.49 12.76,71.50 15.21,75.27 18.04,78.77 21.23,81.96 24.73,84.79 28.50,87.24 41.00,65.59 39.42,64.56 37.96,63.38 36.62,62.04 35.44,60.58 34.41,59.00 33.56,57.32 32.88,55.56 32.39,53.74 32.10,51.88 32.00,50.00"/><polygon points="71.50,87.24 75.27,84.79 78.77,81.96 81.96,78.77 84.79,75.27 87.24,71.50 89.28,67.49 90.90,63.29 92.06,58.94 92.76,54.49 93.00,50.00 68.00,50.00 67.90,51.88 67.61,53.74 67.12,55.56 66.44,57.32 65.59,59.00 64.56,60.58 63.38,62.04 62.04,63.38 60.58,64.56 59.00,65.59"/></g></svg><span class="brand__name">SHIFT-RAD</span></div>
+    <div class="topbar__inner">
+      <div class="topbar__left">
+        <div class="topbar__row">
+          <div class="brand"><svg class="brand__mark" viewBox="0 0 100 100" aria-hidden="true"><g fill="#ffffff"><circle cx="50" cy="50" r="10.5"/><polygon points="71.50,12.76 67.49,10.72 63.29,9.10 58.94,7.94 54.49,7.24 50.00,7.00 45.51,7.24 41.06,7.94 36.71,9.10 32.51,10.72 28.50,12.76 41.00,34.41 42.68,33.56 44.44,32.88 46.26,32.39 48.12,32.10 50.00,32.00 51.88,32.10 53.74,32.39 55.56,32.88 57.32,33.56 59.00,34.41"/><polygon points="7.00,50.00 7.24,54.49 7.94,58.94 9.10,63.29 10.72,67.49 12.76,71.50 15.21,75.27 18.04,78.77 21.23,81.96 24.73,84.79 28.50,87.24 41.00,65.59 39.42,64.56 37.96,63.38 36.62,62.04 35.44,60.58 34.41,59.00 33.56,57.32 32.88,55.56 32.39,53.74 32.10,51.88 32.00,50.00"/><polygon points="71.50,87.24 75.27,84.79 78.77,81.96 81.96,78.77 84.79,75.27 87.24,71.50 89.28,67.49 90.90,63.29 92.06,58.94 92.76,54.49 93.00,50.00 68.00,50.00 67.90,51.88 67.61,53.74 67.12,55.56 66.44,57.32 65.59,59.00 64.56,60.58 63.38,62.04 62.04,63.38 60.58,64.56 59.00,65.59"/></g></svg><span class="brand__name">SHIFT-RAD</span></div>
+        </div>
+        <div class="hi"><div class="hi__greet">${greeting(today.getHours())},</div>
+          <div class="hi__name">${esc(USER.short)}</div>
+          <div class="hi__sub">${esc(USER.role)} · NIP ${esc(USER.nip)}</div></div>
+      </div>
+      <div class="pfp-wrap">
+        <button class="pfp${PHOTO?' pfp--has':''}" type="button" data-pfp aria-label="${PHOTO?'Ganti foto profil':'Tambah foto profil'}">
+          ${PHOTO
+            ? `<img class="pfp__img" src="${PHOTO}" alt="Foto profil">`
+            : `<svg class="pfp__ph" viewBox="0 0 24 24" aria-hidden="true"><g fill="#ffffff"><circle cx="12" cy="8.2" r="4.1"/><path d="M3.8 21c0-4.3 3.7-7.2 8.2-7.2s8.2 2.9 8.2 7.2z"/></g></svg><span class="pfp__add" aria-hidden="true">+</span>`}
+        </button>
+        ${PHOTO?`<button class="pfp-x" type="button" data-pfp-del aria-label="Hapus foto profil">✕</button>`:''}
+      </div>
     </div>
-    <div class="hi"><div class="hi__greet">${greeting(today.getHours())},</div>
-      <div class="hi__name">${esc(USER.short)}</div>
-      <div class="hi__sub">${esc(USER.role)} · NIP ${esc(USER.nip)}</div></div>
   </header>
   <main class="page">
     <div class="absen absen--top">${ABSEN.map(a=>`<a class="absen__btn" href="${a.url}" target="_blank" rel="noopener noreferrer"><span class="absen__label">${a.label}</span><span class="absen__go">↗</span></a>`).join('')}</div>
@@ -850,6 +886,8 @@ function render(){
 /* ---------------- Events ---------------- */
 document.addEventListener('click', e => {
   const view=e.target.closest('[data-view]'); if(view){ state.view=view.dataset.view; closeSheet(); render(); return; }
+  if(e.target.closest('[data-pfp-del]')){ clearPhoto(); render(); return; }
+  if(e.target.closest('[data-pfp]')){ pickPhoto(); return; }
   const nav=e.target.closest('[data-nav]'); if(nav){ const v=nav.dataset.nav;
     if(v==='now'){state.y=today.getFullYear();state.m=today.getMonth();} else {state.m+=+v; if(state.m<0){state.m=11;state.y--;} if(state.m>11){state.m=0;state.y++;}} render(); return; }
   if(e.target.closest('[data-pick]')){ openPicker(); return; }

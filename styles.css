@@ -37,7 +37,26 @@ strong,b{ font-weight:700; }
 .topbar{ background:linear-gradient(155deg,var(--hdr1),var(--hdr2)); color:#fff;
   padding:calc(env(safe-area-inset-top) + 20px) 20px 24px; border-radius:0 0 28px 28px;
   box-shadow:0 14px 34px -20px rgba(77,131,230,.9); }
+.topbar__inner{ display:flex; align-items:center; gap:14px; }
+.topbar__left{ flex:1; min-width:0; }
 .topbar__row{ display:flex; align-items:center; justify-content:space-between; gap:12px; }
+/* slot foto profil di header */
+.pfp-wrap{ position:relative; flex:none; }
+.pfp{ width:62px; height:62px; border-radius:50%; padding:0; position:relative; cursor:pointer;
+  background:rgba(255,255,255,.16); border:1.5px solid rgba(255,255,255,.55);
+  box-shadow:0 7px 18px -9px rgba(0,0,0,.55); display:flex; align-items:center; justify-content:center;
+  -webkit-tap-highlight-color:transparent; transition:transform .12s, background .12s; }
+.pfp:active{ transform:scale(.95); }
+.pfp--has{ background:#fff; border-color:rgba(255,255,255,.85); }
+.pfp__img{ width:100%; height:100%; object-fit:cover; border-radius:50%; display:block; }
+.pfp__ph{ width:34px; height:34px; opacity:.95; }
+.pfp__add{ position:absolute; right:-2px; bottom:-2px; width:22px; height:22px; border-radius:50%;
+  background:#fff; color:var(--blue); font-size:16px; font-weight:800; line-height:1;
+  display:flex; align-items:center; justify-content:center; border:2px solid var(--hdr2);
+  box-shadow:0 2px 6px -2px rgba(0,0,0,.4); }
+.pfp-x{ position:absolute; top:-5px; right:-5px; width:21px; height:21px; border-radius:50%;
+  background:var(--cuti-fg); color:#fff; font-size:11px; font-weight:800; line-height:1; cursor:pointer;
+  display:flex; align-items:center; justify-content:center; border:2px solid #fff; box-shadow:0 2px 6px -2px rgba(0,0,0,.45); }
 .brand{ display:flex; align-items:center; gap:11px; }
 .brand__mark{ width:32px; height:32px; flex:none; filter:drop-shadow(0 2px 5px rgba(0,0,0,.18)); }
 .brand__name{ font-weight:800; font-size:19px; letter-spacing:.08em; }

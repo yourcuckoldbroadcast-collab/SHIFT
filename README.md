@@ -9,6 +9,7 @@ Pengguna saat ini: **Fakhrul Aldia Nugraha, A.Md.Rad (Aldi)**.
 ## ✅ Yang sudah ada (v0.1)
 
 - **Engine pola dasar** yang deterministik — bisa menghitung shift siapa pun, di tanggal mana pun, maju/mundur tanpa batas.
+- **Foto profil (header)** — ketuk lingkaran di kanan header untuk memilih foto dari galeri/berkas; otomatis dikecilkan (256px) & disimpan permanen di perangkat (localStorage). Ketuk **✕** untuk menghapus.
 - **Beranda** — shift Aldi hari ini dengan tanda besar (Pagi / Sore / Malam / Libur), daftar rekan yang bertugas (urutan Pagi → Sore → Malam → Libur), dan dua tombol **Lanjut Absen** (SI-PASTI & SI-PALUI).
 - **Kalender** — tampilan bulan yang bisa **dinavigasi** (‹ bulan sebelumnya / Hari ini / bulan berikutnya ›). Ketuk tanggal mana pun untuk melihat seluruh tim hari itu. Dilengkapi rekap jumlah shift bulan tersebut.
 - **PWA** — bisa "Install/Add to Home Screen" dan tetap jalan tanpa internet setelah dibuka sekali.
