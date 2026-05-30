@@ -11,12 +11,12 @@
   --blue:#1f9d6b; --blue-hi:#33b681; --blue-deep:#137a52; --blue-soft:#e4f4ec;
   --hdr1:#e9f7ef; --hdr2:#d6eede;   /* header mint terang */
 
-  /* warna shift — palet healthcare */
-  --pagi:#2ea36c;  --pagi-bg:#e6f4ec;  --pagi-fg:#1f7a50;
-  --sore:#0fa3ad;  --sore-bg:#e0f4f5;  --sore-fg:#0a7e87;
-  --malam:#6168d6; --malam-bg:#e9eafc; --malam-fg:#4a51c0;
-  --libur:#7c8696; --libur-bg:#eef1f5; --libur-fg:#5b6470;
-  --cuti:#e0795f;  --cuti-bg:#fdeee9;  --cuti-fg:#c75a44;
+  /* warna shift — palet fungsional (diferensiasi cepat; terpisah dari branding hijau) */
+  --pagi:#2f8f5b;  --pagi-bg:#eaf7f0;  --pagi-fg:#2f8f5b;   /* sage green   */
+  --sore:#238a97;  --sore-bg:#eaf7f8;  --sore-fg:#238a97;   /* soft teal    */
+  --malam:#5a58b5; --malam-bg:#ece9fa; --malam-fg:#5a58b5;  /* soft indigo  */
+  --libur:#7d8796; --libur-bg:#f4f6f8; --libur-fg:#7d8796;  /* neutral gray */
+  --cuti:#e0795f;  --cuti-bg:#fdeee9;  --cuti-fg:#c75a44;   /* coral (cuti) */
 
   --radius:20px;
   --shadow:0 10px 30px -14px rgba(24,110,76,.26);
