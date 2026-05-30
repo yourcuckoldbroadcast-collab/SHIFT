@@ -12,11 +12,11 @@
   --hdr1:#e9f7ef; --hdr2:#d6eede;   /* header mint terang */
 
   /* warna shift — palet fungsional (diferensiasi cepat; terpisah dari branding hijau) */
-  --pagi:#2f8f5b;  --pagi-bg:#eaf7f0;  --pagi-fg:#2f8f5b;   /* sage green   */
-  --sore:#238a97;  --sore-bg:#eaf7f8;  --sore-fg:#238a97;   /* soft teal    */
-  --malam:#5a58b5; --malam-bg:#ece9fa; --malam-fg:#5a58b5;  /* soft indigo  */
-  --libur:#7d8796; --libur-bg:#f4f6f8; --libur-fg:#7d8796;  /* neutral gray */
-  --cuti:#e0795f;  --cuti-bg:#fdeee9;  --cuti-fg:#c75a44;   /* coral (cuti) */
+  --pagi:#b98a4a;  --pagi-bg:#f7efe4;  --pagi-fg:#b98a4a;   /* champagne / soft gold */
+  --sore:#4d8e96;  --sore-bg:#eaf5f6;  --sore-fg:#4d8e96;   /* medical teal          */
+  --malam:#6c67a8; --malam-bg:#efedf8; --malam-fg:#6c67a8;  /* dusty indigo          */
+  --libur:#8a909c; --libur-bg:#f4f5f7; --libur-fg:#8a909c;  /* stone gray            */
+  --cuti:#e0795f;  --cuti-bg:#fdeee9;  --cuti-fg:#c75a44;   /* coral (cuti)          */
 
   --radius:20px;
   --shadow:0 10px 30px -14px rgba(24,110,76,.26);
