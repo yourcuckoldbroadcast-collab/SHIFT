@@ -79,7 +79,7 @@ python3 -m http.server 8080
 
 ```
 index.html           kerangka halaman + pemuatan font/gaya
-styles.css           tema terang putih–biru pastel (gaya office) + sistem warna shift
+styles.css           tema terang putih–hijau healthcare (mint + gradasi watermark) + sistem warna shift
 app.js               ENGINE + mesin pengganti + render Beranda / Kalender / Atur
 manifest.webmanifest metadata PWA
 sw.js                service worker (cache untuk offline)

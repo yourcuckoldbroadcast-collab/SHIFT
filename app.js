@@ -351,7 +351,7 @@ function renderBeranda(){
     <div class="topbar__inner">
       <div class="topbar__left">
         <div class="topbar__row">
-          <div class="brand"><svg class="brand__mark" viewBox="0 0 100 100" aria-hidden="true"><g fill="#ffffff"><circle cx="50" cy="50" r="10.5"/><polygon points="71.50,12.76 67.49,10.72 63.29,9.10 58.94,7.94 54.49,7.24 50.00,7.00 45.51,7.24 41.06,7.94 36.71,9.10 32.51,10.72 28.50,12.76 41.00,34.41 42.68,33.56 44.44,32.88 46.26,32.39 48.12,32.10 50.00,32.00 51.88,32.10 53.74,32.39 55.56,32.88 57.32,33.56 59.00,34.41"/><polygon points="7.00,50.00 7.24,54.49 7.94,58.94 9.10,63.29 10.72,67.49 12.76,71.50 15.21,75.27 18.04,78.77 21.23,81.96 24.73,84.79 28.50,87.24 41.00,65.59 39.42,64.56 37.96,63.38 36.62,62.04 35.44,60.58 34.41,59.00 33.56,57.32 32.88,55.56 32.39,53.74 32.10,51.88 32.00,50.00"/><polygon points="71.50,87.24 75.27,84.79 78.77,81.96 81.96,78.77 84.79,75.27 87.24,71.50 89.28,67.49 90.90,63.29 92.06,58.94 92.76,54.49 93.00,50.00 68.00,50.00 67.90,51.88 67.61,53.74 67.12,55.56 66.44,57.32 65.59,59.00 64.56,60.58 63.38,62.04 62.04,63.38 60.58,64.56 59.00,65.59"/></g></svg><span class="brand__name">SHIFT-RAD</span></div>
+          <div class="brand"><svg class="brand__mark" viewBox="0 0 100 100" aria-hidden="true"><g fill="#1f9d6b"><circle cx="50" cy="50" r="10.5"/><polygon points="71.50,12.76 67.49,10.72 63.29,9.10 58.94,7.94 54.49,7.24 50.00,7.00 45.51,7.24 41.06,7.94 36.71,9.10 32.51,10.72 28.50,12.76 41.00,34.41 42.68,33.56 44.44,32.88 46.26,32.39 48.12,32.10 50.00,32.00 51.88,32.10 53.74,32.39 55.56,32.88 57.32,33.56 59.00,34.41"/><polygon points="7.00,50.00 7.24,54.49 7.94,58.94 9.10,63.29 10.72,67.49 12.76,71.50 15.21,75.27 18.04,78.77 21.23,81.96 24.73,84.79 28.50,87.24 41.00,65.59 39.42,64.56 37.96,63.38 36.62,62.04 35.44,60.58 34.41,59.00 33.56,57.32 32.88,55.56 32.39,53.74 32.10,51.88 32.00,50.00"/><polygon points="71.50,87.24 75.27,84.79 78.77,81.96 81.96,78.77 84.79,75.27 87.24,71.50 89.28,67.49 90.90,63.29 92.06,58.94 92.76,54.49 93.00,50.00 68.00,50.00 67.90,51.88 67.61,53.74 67.12,55.56 66.44,57.32 65.59,59.00 64.56,60.58 63.38,62.04 62.04,63.38 60.58,64.56 59.00,65.59"/></g></svg><span class="brand__name">SHIFT-RAD</span></div>
         </div>
         <div class="hi"><div class="hi__greet">${greeting(today.getHours())},</div>
           <div class="hi__name">${esc(USER.short)}</div>
@@ -361,7 +361,7 @@ function renderBeranda(){
         <button class="pfp${PHOTO?' pfp--has':''}" type="button" data-pfp aria-label="${PHOTO?'Ganti foto profil':'Tambah foto profil'}">
           ${PHOTO
             ? `<img class="pfp__img" src="${PHOTO}" alt="Foto profil">`
-            : `<svg class="pfp__ph" viewBox="0 0 24 24" aria-hidden="true"><g fill="#ffffff"><circle cx="12" cy="8.2" r="4.1"/><path d="M3.8 21c0-4.3 3.7-7.2 8.2-7.2s8.2 2.9 8.2 7.2z"/></g></svg><span class="pfp__add" aria-hidden="true">+</span>`}
+            : `<svg class="pfp__ph" viewBox="0 0 24 24" aria-hidden="true"><g fill="#2ea36c"><circle cx="12" cy="8.2" r="4.1"/><path d="M3.8 21c0-4.3 3.7-7.2 8.2-7.2s8.2 2.9 8.2 7.2z"/></g></svg><span class="pfp__add" aria-hidden="true">+</span>`}
         </button>
         ${PHOTO?`<button class="pfp-x" type="button" data-pfp-del aria-label="Hapus foto profil">✕</button>`:''}
       </div>
@@ -869,7 +869,12 @@ function renderSimulasi(){
 }
 
 /* ---------------- Nav + mount ---------------- */
-const NAV = [{id:'beranda',label:'Beranda',icon:'⌂'},{id:'kalender',label:'Kalender',icon:'▦'},{id:'simulasi',label:'Simulasi',icon:'◷'},{id:'atur',label:'Atur',icon:'⚙'}];
+const NAV = [
+  {id:'beranda',  label:'Beranda',  icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.7 12 3.5l9 7.2"/><path d="M5.2 9.4V20h13.6V9.4"/></svg>'},
+  {id:'kalender', label:'Kalender', icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15.5" rx="2.6"/><path d="M3.5 9.6h17"/><path d="M8 3.3v3.4M16 3.3v3.4"/></svg>'},
+  {id:'simulasi', label:'Simulasi', icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.6"/><path d="M12 7.4V12l3.1 1.9"/></svg>'},
+  {id:'atur',     label:'Atur',     icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.1"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>'},
+];
 function renderNav(){
   const badge = (allConflicts().length)? '<span class="tab__badge"></span>':'';
   return `<nav class="tabbar tabbar--4">${NAV.map(n=>`<button type="button" class="tab ${state.view===n.id?'tab--on':''}" data-view="${n.id}">
