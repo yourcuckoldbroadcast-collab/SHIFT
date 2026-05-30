@@ -107,6 +107,8 @@ strong,b{ font-weight:700; }
   border-radius:14px; padding:13px 15px 13px 40px; font-size:13.5px; line-height:1.5; font-style:italic; color:var(--ink-2); }
 .hero__qmark{ position:absolute; left:12px; top:3px; font-size:36px; font-weight:800; font-style:normal;
   color:var(--accent,var(--blue)); opacity:.45; line-height:1; }
+.hero__wm{ position:absolute; top:15px; right:13px; width:97px; height:92px; color:var(--accent,var(--green)); opacity:.85; z-index:0; pointer-events:none; }
+.hero__eyebrow,.hero__main,.hero__sub,.hero__flag,.hero__rule,.hero__time,.hero__quote{ position:relative; z-index:1; }
 
 /* ---------- grup shift + chip ---------- */
 .stack{ display:flex; flex-direction:column; gap:10px; }
