@@ -35,44 +35,68 @@ strong,b{ font-weight:700; }
 .app{ max-width:460px; margin:0 auto; min-height:100vh; position:relative; padding-bottom:90px; background:var(--bg); }
 .page{ padding:14px 18px 12px; }
 
-/* ---------- topbar: header mint + watermark gelombang (Beranda) ---------- */
+/* ---------- topbar: header premium healthcare (Beranda) ---------- */
 .topbar{ position:relative; overflow:hidden; color:var(--ink);
   background:linear-gradient(150deg,#edf8f1 0%,#e3f4ea 52%,#d3ecdc 100%);
-  padding:calc(env(safe-area-inset-top) + 20px) 20px 24px; border-radius:0 0 28px 28px;
+  padding:calc(env(safe-area-inset-top) + 18px) 20px 22px; border-radius:0 0 28px 28px;
   box-shadow:0 12px 30px -20px rgba(24,110,76,.5); }
-.topbar::after{ content:""; position:absolute; inset:0; pointer-events:none; z-index:0; opacity:.42;
-  background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='440' height='340' viewBox='0 0 440 340'%3E%3Cg fill='none' stroke='%23ffffff' stroke-width='15' stroke-linecap='round'%3E%3Cpath d='M-30 80 C 120 25 310 140 490 90'/%3E%3Cpath d='M-30 150 C 120 95 310 210 490 160'/%3E%3Cpath d='M-30 220 C 120 165 310 280 490 230'/%3E%3Cpath d='M-30 290 C 120 235 310 350 490 300'/%3E%3C/g%3E%3C/svg%3E") right center / 118% 130% no-repeat; }
 .topbar--cal::after{ content:none; }
-.topbar__inner{ position:relative; z-index:1; display:flex; align-items:center; gap:14px; }
-.topbar__left{ flex:1; min-width:0; }
-.topbar__row{ display:flex; align-items:center; justify-content:space-between; gap:12px; }
-/* slot foto profil di header */
-.pfp-wrap{ position:relative; flex:none; }
-.pfp{ width:62px; height:62px; border-radius:50%; padding:0; position:relative; cursor:pointer;
-  background:var(--green-soft); border:1.5px solid rgba(31,157,107,.35);
-  box-shadow:0 7px 18px -10px rgba(24,110,76,.6); display:flex; align-items:center; justify-content:center;
-  -webkit-tap-highlight-color:transparent; transition:transform .12s, background .12s; }
-.pfp:active{ transform:scale(.95); }
-.pfp--has{ background:#fff; border-color:#fff; box-shadow:0 7px 18px -10px rgba(24,110,76,.5); }
-.pfp__img{ width:100%; height:100%; object-fit:cover; border-radius:50%; display:block; }
-.pfp__ph{ width:34px; height:34px; }
-.pfp__add{ position:absolute; right:-2px; bottom:-2px; width:22px; height:22px; border-radius:50%;
-  background:var(--green); color:#fff; font-size:16px; font-weight:800; line-height:1;
-  display:flex; align-items:center; justify-content:center; border:2px solid #fff;
-  box-shadow:0 2px 6px -2px rgba(24,110,76,.5); }
-.pfp-x{ position:absolute; top:-5px; right:-5px; width:21px; height:21px; border-radius:50%;
-  background:var(--cuti-fg); color:#fff; font-size:11px; font-weight:800; line-height:1; cursor:pointer;
-  display:flex; align-items:center; justify-content:center; border:2px solid #fff; box-shadow:0 2px 6px -2px rgba(0,0,0,.35); }
+.topbar__deco{ position:absolute; inset:0; width:100%; height:100%; pointer-events:none; z-index:0; }
+.topbar__wave{ position:absolute; left:0; right:0; bottom:0; width:100%; height:152px; pointer-events:none; z-index:0; }
+.topbar--cal .topbar__deco,.topbar--cal .topbar__wave{ display:none; }
+.topbar__inner{ position:relative; z-index:1; }
+.topbar__top{ display:flex; align-items:flex-start; justify-content:space-between; gap:12px; }
+
+/* brand lockup */
 .brand{ display:flex; align-items:center; gap:11px; }
-.brand__mark{ width:32px; height:32px; flex:none; filter:drop-shadow(0 2px 4px rgba(24,110,76,.22)); }
-.brand__name{ font-weight:800; font-size:19px; letter-spacing:.08em; color:var(--green-deep); }
+.brand__mark{ width:37px; height:37px; flex:none; filter:drop-shadow(0 2px 5px rgba(24,110,76,.25)); }
+.brand__div{ width:1.5px; height:32px; border-radius:2px; background:rgba(19,122,82,.28); flex:none; }
+.brand__txt{ display:flex; flex-direction:column; gap:3px; }
+.brand__name{ font-weight:800; font-size:18px; letter-spacing:.06em; color:var(--green-deep); line-height:1; }
+.brand__tag{ font-size:7.5px; font-weight:700; letter-spacing:.2em; color:var(--green); opacity:.72; }
+
+/* foto profil + ring putih + status online */
+.pfp-wrap{ position:relative; flex:none; margin-top:12px; }
+.pfp{ width:66px; height:66px; border-radius:50%; padding:0; position:relative; cursor:pointer;
+  background:var(--green-soft); border:3px solid #fff;
+  box-shadow:0 8px 20px -9px rgba(24,110,76,.55); display:flex; align-items:center; justify-content:center;
+  -webkit-tap-highlight-color:transparent; transition:transform .12s; }
+.pfp:active{ transform:scale(.95); }
+.pfp__img{ width:100%; height:100%; object-fit:cover; border-radius:50%; display:block; }
+.pfp__ph{ width:36px; height:36px; }
+.pfp__add{ position:absolute; right:-1px; bottom:-1px; width:22px; height:22px; border-radius:50%;
+  background:var(--green); color:#fff; font-size:16px; font-weight:800; line-height:1;
+  display:flex; align-items:center; justify-content:center; border:2.5px solid #fff;
+  box-shadow:0 2px 6px -2px rgba(24,110,76,.5); }
+.pfp-dot{ position:absolute; right:1px; bottom:3px; width:15px; height:15px; border-radius:50%;
+  background:#1fb877; border:3px solid #fff; box-shadow:0 1px 4px -1px rgba(0,0,0,.3); }
+.pfp-x{ position:absolute; top:-4px; right:-4px; width:20px; height:20px; border-radius:50%;
+  background:var(--cuti-fg); color:#fff; font-size:10.5px; font-weight:800; line-height:1; cursor:pointer;
+  display:flex; align-items:center; justify-content:center; border:2px solid #fff; box-shadow:0 2px 6px -2px rgba(0,0,0,.35); }
+
+/* greeting + pill peran */
+.hi{ margin-top:16px; }
+.hi__greet{ font-size:13px; color:var(--ink-2); font-weight:500; }
+.hi__name{ font-size:25px; font-weight:800; line-height:1.1; margin-top:1px; color:var(--green-deep); }
+.role-pill{ display:inline-flex; align-items:center; gap:9px; margin-top:11px; padding:8px 14px; max-width:100%;
+  background:rgba(255,255,255,.62); border:1px solid rgba(255,255,255,.85); border-radius:999px;
+  box-shadow:0 4px 14px -10px rgba(24,110,76,.55); }
+.role-pill__ic{ width:18px; height:18px; color:var(--green); flex:none; }
+.role-pill__role{ font-size:13px; font-weight:700; color:var(--green-deep); flex:none; }
+.role-pill__div{ width:1px; height:14px; background:rgba(19,122,82,.25); flex:none; }
+.role-pill__nip{ font-size:12px; font-weight:600; color:var(--ink-2); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+
+/* badge nilai: Safety · Precision · Caring */
+.creds{ display:flex; margin-top:16px; }
+.cred{ flex:0 0 auto; width:76px; display:flex; flex-direction:column; align-items:center; gap:6px; position:relative; }
+.cred + .cred::before{ content:""; position:absolute; left:0; top:5px; bottom:5px; width:1px; background:rgba(19,122,82,.16); }
+.cred__ic{ width:36px; height:36px; border-radius:50%; background:rgba(255,255,255,.6); border:1px solid rgba(255,255,255,.85);
+  display:flex; align-items:center; justify-content:center; color:var(--green); box-shadow:0 3px 10px -7px rgba(24,110,76,.5); }
+.cred__ic svg{ width:19px; height:19px; }
+.cred__t{ font-size:11px; font-weight:600; color:var(--ink-2); }
 .iconbtn{ width:38px; height:38px; border-radius:12px; background:var(--surface-3); color:var(--muted);
   font-size:15px; display:flex; align-items:center; justify-content:center; }
 .iconbtn[disabled]{ opacity:.5; }
-.hi{ margin-top:20px; }
-.hi__greet{ font-size:13px; color:var(--ink-2); font-weight:500; }
-.hi__name{ font-size:22px; font-weight:800; line-height:1.18; margin-top:2px; color:var(--green-deep); }
-.hi__sub{ font-size:12px; color:var(--muted); margin-top:4px; }
 
 /* topbar terang utk Kalender & Atur */
 .topbar--cal{ background:none; color:var(--ink); box-shadow:none; border-radius:0;

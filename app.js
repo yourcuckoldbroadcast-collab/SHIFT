@@ -348,22 +348,41 @@ function renderBeranda(){
 
   return `
   <header class="topbar">
+    <svg class="topbar__wave" viewBox="0 0 390 152" preserveAspectRatio="none" aria-hidden="true">
+      <path d="M198,152 C 280,120 346,66 391,16 L391,152 Z" fill="#bfe6d1" opacity=".5"/>
+      <path d="M252,152 C 322,122 360,80 391,44 L391,152 Z" fill="#46ad81" opacity=".92"/>
+      <path d="M306,152 C 350,126 372,98 391,70 L391,152 Z" fill="#1e8157"/>
+    </svg>
     <div class="topbar__inner">
-      <div class="topbar__left">
-        <div class="topbar__row">
-          <div class="brand"><svg class="brand__mark" viewBox="0 0 100 100" aria-hidden="true"><g fill="#1f9d6b"><circle cx="50" cy="50" r="10.5"/><polygon points="71.50,12.76 67.49,10.72 63.29,9.10 58.94,7.94 54.49,7.24 50.00,7.00 45.51,7.24 41.06,7.94 36.71,9.10 32.51,10.72 28.50,12.76 41.00,34.41 42.68,33.56 44.44,32.88 46.26,32.39 48.12,32.10 50.00,32.00 51.88,32.10 53.74,32.39 55.56,32.88 57.32,33.56 59.00,34.41"/><polygon points="7.00,50.00 7.24,54.49 7.94,58.94 9.10,63.29 10.72,67.49 12.76,71.50 15.21,75.27 18.04,78.77 21.23,81.96 24.73,84.79 28.50,87.24 41.00,65.59 39.42,64.56 37.96,63.38 36.62,62.04 35.44,60.58 34.41,59.00 33.56,57.32 32.88,55.56 32.39,53.74 32.10,51.88 32.00,50.00"/><polygon points="71.50,87.24 75.27,84.79 78.77,81.96 81.96,78.77 84.79,75.27 87.24,71.50 89.28,67.49 90.90,63.29 92.06,58.94 92.76,54.49 93.00,50.00 68.00,50.00 67.90,51.88 67.61,53.74 67.12,55.56 66.44,57.32 65.59,59.00 64.56,60.58 63.38,62.04 62.04,63.38 60.58,64.56 59.00,65.59"/></g></svg><span class="brand__name">SHIFT-RAD</span></div>
+      <div class="topbar__top">
+        <div class="brand">
+          <svg class="brand__mark" viewBox="0 0 100 100" aria-hidden="true"><g fill="#1f9d6b"><circle cx="50" cy="50" r="10.5"/><polygon points="71.50,12.76 67.49,10.72 63.29,9.10 58.94,7.94 54.49,7.24 50.00,7.00 45.51,7.24 41.06,7.94 36.71,9.10 32.51,10.72 28.50,12.76 41.00,34.41 42.68,33.56 44.44,32.88 46.26,32.39 48.12,32.10 50.00,32.00 51.88,32.10 53.74,32.39 55.56,32.88 57.32,33.56 59.00,34.41"/><polygon points="7.00,50.00 7.24,54.49 7.94,58.94 9.10,63.29 10.72,67.49 12.76,71.50 15.21,75.27 18.04,78.77 21.23,81.96 24.73,84.79 28.50,87.24 41.00,65.59 39.42,64.56 37.96,63.38 36.62,62.04 35.44,60.58 34.41,59.00 33.56,57.32 32.88,55.56 32.39,53.74 32.10,51.88 32.00,50.00"/><polygon points="71.50,87.24 75.27,84.79 78.77,81.96 81.96,78.77 84.79,75.27 87.24,71.50 89.28,67.49 90.90,63.29 92.06,58.94 92.76,54.49 93.00,50.00 68.00,50.00 67.90,51.88 67.61,53.74 67.12,55.56 66.44,57.32 65.59,59.00 64.56,60.58 63.38,62.04 62.04,63.38 60.58,64.56 59.00,65.59"/></g></svg>
+          <span class="brand__div"></span>
+          <span class="brand__txt"><span class="brand__name">SHIFT-RAD</span><span class="brand__tag">SAFE · PRECISE · CARING</span></span>
         </div>
-        <div class="hi"><div class="hi__greet">${greeting(today.getHours())},</div>
-          <div class="hi__name">${esc(USER.short)}</div>
-          <div class="hi__sub">${esc(USER.role)} · NIP ${esc(USER.nip)}</div></div>
+        <div class="pfp-wrap">
+          <button class="pfp${PHOTO?' pfp--has':''}" type="button" data-pfp aria-label="${PHOTO?'Ganti foto profil':'Tambah foto profil'}">
+            ${PHOTO
+              ? `<img class="pfp__img" src="${PHOTO}" alt="Foto profil">`
+              : `<svg class="pfp__ph" viewBox="0 0 24 24" aria-hidden="true"><g fill="#2ea36c"><circle cx="12" cy="8.2" r="4.1"/><path d="M3.8 21c0-4.3 3.7-7.2 8.2-7.2s8.2 2.9 8.2 7.2z"/></g></svg><span class="pfp__add" aria-hidden="true">+</span>`}
+          </button>
+          ${PHOTO?`<span class="pfp-dot" aria-hidden="true"></span><button class="pfp-x" type="button" data-pfp-del aria-label="Hapus foto profil">✕</button>`:''}
+        </div>
       </div>
-      <div class="pfp-wrap">
-        <button class="pfp${PHOTO?' pfp--has':''}" type="button" data-pfp aria-label="${PHOTO?'Ganti foto profil':'Tambah foto profil'}">
-          ${PHOTO
-            ? `<img class="pfp__img" src="${PHOTO}" alt="Foto profil">`
-            : `<svg class="pfp__ph" viewBox="0 0 24 24" aria-hidden="true"><g fill="#2ea36c"><circle cx="12" cy="8.2" r="4.1"/><path d="M3.8 21c0-4.3 3.7-7.2 8.2-7.2s8.2 2.9 8.2 7.2z"/></g></svg><span class="pfp__add" aria-hidden="true">+</span>`}
-        </button>
-        ${PHOTO?`<button class="pfp-x" type="button" data-pfp-del aria-label="Hapus foto profil">✕</button>`:''}
+      <div class="hi">
+        <div class="hi__greet">${greeting(today.getHours())},</div>
+        <div class="hi__name">${esc(USER.short)}</div>
+        <div class="role-pill">
+          <svg class="role-pill__ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3.5v4.2a4.3 4.3 0 0 0 8.6 0V3.5"/><path d="M9.3 16.8v.6a4.2 4.2 0 0 0 8.4 0v-2.6"/><circle cx="18.6" cy="12.2" r="2.2"/><circle cx="5" cy="3.3" r="1.05"/><circle cx="13.6" cy="3.3" r="1.05"/></svg>
+          <span class="role-pill__role">${esc(USER.role)}</span>
+          <span class="role-pill__div"></span>
+          <span class="role-pill__nip">NIP ${esc(USER.nip)}</span>
+        </div>
+      </div>
+      <div class="creds">
+        <div class="cred"><span class="cred__ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 5 6v5.4c0 4.2 3 7 7 8.6 4-1.6 7-4.4 7-8.6V6z"/><path d="M9 12l2 2 4-4"/></svg></span><span class="cred__t">Safety</span></div>
+        <div class="cred"><span class="cred__ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="7.5"/><circle cx="12" cy="12" r="2.8"/><path d="M12 1.6v3M12 19.4v3M1.6 12h3M19.4 12h3"/></svg></span><span class="cred__t">Precision</span></div>
+        <div class="cred"><span class="cred__ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19.5C6.6 15.6 3.6 12.4 3.6 8.9 3.6 6.5 5.5 4.8 7.7 4.8c1.6 0 3 .9 3.8 2.2l.5.8.5-.8c.8-1.3 2.2-2.2 3.8-2.2 2.2 0 4.1 1.7 4.1 4.1 0 3.5-3 6.7-8.4 10.6z"/><path d="M12 9.2v4M10 11.2h4"/></svg></span><span class="cred__t">Caring</span></div>
       </div>
     </div>
   </header>
