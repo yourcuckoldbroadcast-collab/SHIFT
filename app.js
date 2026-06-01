@@ -360,14 +360,14 @@ function renderBeranda(){
           <span class="brand__div"></span>
           <span class="brand__txt"><span class="brand__name">SHIFT-RAD</span><span class="brand__tag">SAFE · PRECISE · CARING</span></span>
         </div>
-        <div class="pfp-wrap">
-          <button class="pfp${PHOTO?' pfp--has':''}" type="button" data-pfp aria-label="${PHOTO?'Ganti foto profil':'Tambah foto profil'}">
-            ${PHOTO
-              ? `<img class="pfp__img" src="${PHOTO}" alt="Foto profil">`
-              : `<svg class="pfp__ph" viewBox="0 0 24 24" aria-hidden="true"><g fill="#2ea36c"><circle cx="12" cy="8.2" r="4.1"/><path d="M3.8 21c0-4.3 3.7-7.2 8.2-7.2s8.2 2.9 8.2 7.2z"/></g></svg><span class="pfp__add" aria-hidden="true">+</span>`}
-          </button>
-          ${PHOTO?`<span class="pfp-dot" aria-hidden="true"></span><button class="pfp-x" type="button" data-pfp-del aria-label="Hapus foto profil">✕</button>`:''}
-        </div>
+      </div>
+      <div class="pfp-wrap">
+        <button class="pfp${PHOTO?' pfp--has':''}" type="button" data-pfp aria-label="${PHOTO?'Ganti foto profil':'Tambah foto profil'}">
+          ${PHOTO
+            ? `<img class="pfp__img" src="${PHOTO}" alt="Foto profil">`
+            : `<svg class="pfp__ph" viewBox="0 0 24 24" aria-hidden="true"><g fill="#2ea36c"><circle cx="12" cy="8.2" r="4.1"/><path d="M3.8 21c0-4.3 3.7-7.2 8.2-7.2s8.2 2.9 8.2 7.2z"/></g></svg><span class="pfp__add" aria-hidden="true">+</span>`}
+        </button>
+        ${PHOTO?`<span class="pfp-dot" aria-hidden="true"></span><button class="pfp-x" type="button" data-pfp-del aria-label="Hapus foto profil">✕</button>`:''}
       </div>
       <div class="hi">
         <div class="hi__greet">${greeting(today.getHours())},</div>
