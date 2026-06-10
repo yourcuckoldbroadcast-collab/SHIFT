@@ -7,9 +7,28 @@
    Pengguna: Fakhrul Aldia (Aldi). Offline-first PWA.
    ============================================================ */
 
-/* ---------------- Konfigurasi ---------------- */
-const CYCLE = ['P','P','S','S','M','M','L','L'];
-const REF   = Date.UTC(2026, 4, 1);
+/* ---------------- Konfigurasi penjadwalan (bisa diedit & disimpan) ---------------- */
+/* SCHED = pola siklus rotasi + tanggal acuan + offset awal tiap rotator.
+   Default = pola lama (P,P,S,S,M,M,L,L; acuan 1 Mei 2026; offset 0/2/4/6) → perilaku identik.
+   Disimpan di localStorage; diubah lewat Editor Pola di tab Atur. */
+const SCHED_KEY = 'shift-radiologi-sched-v1';
+const SCHED_DEFAULT = Object.freeze({
+  cycle: ['P','P','S','S','M','M','L','L'],
+  ref: '2026-05-01',
+  offsets: { didit:0, aldi:2, luthfi:4, humaidi:6 },
+});
+function loadSched(){
+  try{ const s=JSON.parse(localStorage.getItem(SCHED_KEY));
+    if (s && Array.isArray(s.cycle) && s.cycle.length && typeof s.ref==='string' && s.offsets) return s;
+  }catch(e){}
+  return JSON.parse(JSON.stringify(SCHED_DEFAULT));
+}
+let SCHED = loadSched();
+function saveSched(s){ try{ localStorage.setItem(SCHED_KEY, JSON.stringify(s)); SCHED=s; return true; }catch(e){ return false; } }
+function resetSched(){ try{ localStorage.removeItem(SCHED_KEY); }catch(e){} SCHED = JSON.parse(JSON.stringify(SCHED_DEFAULT)); }
+const isDefaultSched = () => JSON.stringify(SCHED.cycle)===JSON.stringify(SCHED_DEFAULT.cycle)
+  && JSON.stringify(SCHED.offsets)===JSON.stringify(SCHED_DEFAULT.offsets);
+function refUTC(){ const p=SCHED.ref.split('-').map(Number); return Date.UTC(p[0], p[1]-1, p[2]); }
 
 const STAFF = [
   { id:'dina',     name:'dr. Dina Rahman, Sp.Rad',         short:'dr. Dina', role:'Dokter Sp. Radiologi',  type:'cadangan', canSub:false, phone:'085156862399' },
@@ -81,10 +100,21 @@ function pickPhoto(){
     shrinkPhoto(f, data=>{ savePhoto(data); render(); }); });
   inp.click();
 }
-const ABSEN = [
+/* Situs absen (utama & cadangan) — bisa diedit & disimpan agar tak hardcoded bila URL berubah */
+const ABSEN_KEY = 'shift-radiologi-absen-v1';
+const ABSEN_DEFAULT = [
   { label:'SI-PASTI', sub:'Absen utama',    url:'https://pasti.seruyankab.go.id/' },
   { label:'SI-PALUI', sub:'Absen cadangan', url:'https://palui.seruyankab.go.id/' },
 ];
+function loadAbsen(){
+  try{ const a=JSON.parse(localStorage.getItem(ABSEN_KEY));
+    if (Array.isArray(a) && a.length===2 && a.every(x=>x && typeof x.url==='string')) return a;
+  }catch(e){}
+  return JSON.parse(JSON.stringify(ABSEN_DEFAULT));
+}
+let ABSEN = loadAbsen();
+function saveAbsen(a){ try{ localStorage.setItem(ABSEN_KEY, JSON.stringify(a)); ABSEN=a; return true; }catch(e){ return false; } }
+function resetAbsen(){ try{ localStorage.removeItem(ABSEN_KEY); }catch(e){} ABSEN = JSON.parse(JSON.stringify(ABSEN_DEFAULT)); }
 const HARI  = ['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'];
 const HARI3 = ['Sen','Sel','Rab','Kam','Jum','Sab','Min'];
 const BULAN = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
@@ -93,7 +123,22 @@ const BULAN3= ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov'
 /* ---------------- Engine dasar ---------------- */
 const USER = STAFF.find(s=>s.isUser);
 const byId = id => STAFF.find(s=>s.id===id);
-const dayNo  = d => Math.round((Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()) - REF)/86400000);
+const ROTATOR_IDS = STAFF.filter(s=>s.type==='rotator').sort((a,b)=>(SCHED_DEFAULT.offsets[a.id]||0)-(SCHED_DEFAULT.offsets[b.id]||0)).map(s=>s.id);
+/* Validasi cakupan pola: tiap hari siklus harus tepat ada 1 Pagi, 1 Sore, 1 Malam, 1 Libur di antara 4 rotator. */
+function coverageOf(sched){
+  const cyc=sched.cycle, L=cyc.length;
+  const offs = ROTATOR_IDS.map(id=>((((sched.offsets[id]||0)%L)+L)%L));
+  const days=[]; let ok = (L%4===0);
+  for (let d=0; d<L; d++){
+    const shifts = offs.map(o=>cyc[(o+d)%L]);
+    const cnt={P:0,S:0,M:0,L:0}; shifts.forEach(s=>{ if(cnt[s]!=null) cnt[s]++; });
+    const dayOk = cnt.P===1&&cnt.S===1&&cnt.M===1&&cnt.L===1;
+    if(!dayOk) ok=false;
+    days.push({ d, shifts, ok:dayOk });
+  }
+  return { ok, days, L };
+}
+const dayNo  = d => Math.round((Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()) - refUTC())/86400000);
 const pad    = n => String(n).padStart(2,'0');
 const keyOf  = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
 const fromKey= k => { const [y,m,da]=k.split('-').map(Number); return new Date(y,m-1,da); };
@@ -113,7 +158,8 @@ function baseShiftOf(s, d){
   const h = holidayInfo(d);
   if (s.type==='rotator'){
     if (h && h.scope==='all') return 'L';            // libur instansi menyeluruh → rotator ikut libur
-    return CYCLE[(((s.phase+dayNo(d))%8)+8)%8];
+    const cyc=SCHED.cycle, L=cyc.length, ph=(SCHED.offsets[s.id]||0);
+    return cyc[(((ph+dayNo(d))%L)+L)%L];
   }
   return (isSun(d)||h) ? 'L' : 'P';                  // cadangan/dinas pagi libur tiap Minggu & semua tanggal merah
 }
@@ -228,10 +274,10 @@ function dayHasAdj(date){ const k=keyOf(date); return ADJ.some(a=>a.date===k || 
 // Fase shift pengguna: hari ke-n dari total hari blok shift yang sama (siklus 2-harian → 1/2 atau 2/2)
 function cyclePhase(date){
   if (USER.type!=='rotator') return null;
-  const base = baseShiftOf(USER, date);
+  const base = baseShiftOf(USER, date), L = SCHED.cycle.length;
   let back=0, fwd=0;
-  for (let i=1;i<8;i++){ if (baseShiftOf(USER, addDays(date,-i))===base) back++; else break; }
-  for (let i=1;i<8;i++){ if (baseShiftOf(USER, addDays(date, i))===base) fwd++;  else break; }
+  for (let i=1;i<=L;i++){ if (baseShiftOf(USER, addDays(date,-i))===base) back++; else break; }
+  for (let i=1;i<=L;i++){ if (baseShiftOf(USER, addDays(date, i))===base) fwd++;  else break; }
   return { n:back+1, total:back+1+fwd, base };
 }
 
@@ -330,13 +376,28 @@ function heroState(date){
       return mk(ui.primary, { chip:'EKSTRA', time:tm(ui.primary), quote:'Dinas tambahan di luar pola jadwal pada hari ini.' });
     }
   }
-  // hari dinas default (murni siklus) → quote dari ACUAN, chip "KE-n"
+  // hari dinas default (murni siklus) → chip "KE-n". Kutipan: teks ACUAN saat pola bawaan,
+  // kutipan dinamis (lihat shift besok) saat pola sudah diubah agar tetap akurat.
   const ph=cyclePhase(date);
   const n = ph ? ph.n : 1;
-  const key = (ui.state==='libur'?'L':base) + n;
+  const code = ui.state==='libur' ? 'L' : ui.primary;
+  const key = code + n;
   const chip = ph ? `KE-${ph.n}` : null;
-  if (ui.state==='libur') return mk('L', { chip, quote:ACUAN[key]||'Hari libur — selamat beristirahat.' });
-  return mk(ui.primary, { chip, time:tm(ui.primary), quote:ACUAN[key]||`Bertugas pukul ${tm(ui.primary)}.` });
+  const quote = (isDefaultSched() && ACUAN[key]) ? ACUAN[key] : dynQuote(date, code, n);
+  if (ui.state==='libur') return mk('L', { chip, quote });
+  return mk(ui.primary, { chip, time:tm(ui.primary), quote });
+}
+/* Kutipan dinamis berbasis shift hari ini & besok — akurat untuk pola apa pun. */
+function dynQuote(date, code, n){
+  const lab = sh => SHIFT[sh].label;
+  const tmr = baseShiftOf(USER, addDays(date,1));
+  if (code==='L'){
+    if (tmr==='L') return `Hari libur ke-${n}. Nikmati jeda — besok Anda masih libur.`;
+    return `Hari libur ke-${n}. Besok shift ${lab(tmr)} kembali dimulai, siapkan tenaga.`;
+  }
+  if (tmr===code) return `Hari ke-${n} shift ${lab(code)}. Besok Anda masih bertugas pada jam yang sama.`;
+  if (tmr==='L')  return `Hari ke-${n} shift ${lab(code)}. Setelah tugas hari ini, besok waktunya beristirahat.`;
+  return `Hari ke-${n} shift ${lab(code)}. Besok Anda beralih ke shift ${lab(tmr)}.`;
 }
 
 /* ---------------- Beranda ---------------- */
@@ -512,6 +573,14 @@ function renderAtur(){
     <button class="bigbtn bigbtn--ghost" type="button" data-addhol>+ Tambah hari libur instansi</button>
     ${sectionTitle('Arsip hutang dinas')}
     <div class="list">${debtHTML}</div>
+    ${sectionTitle('Pola jadwal rotasi')}
+    <div class="list"><div class="adj">
+      <div class="adj__main"><div class="adj__name">${isDefaultSched()?'Pola bawaan':'Pola khusus'} · siklus ${SCHED.cycle.length} hari</div>
+        <div class="adj__meta">${SCHED.cycle.map(c=>esc(SHIFT[c].label)).join(' · ')} · acuan ${fmtKey(SCHED.ref)}</div></div></div></div>
+    <button class="bigbtn bigbtn--ghost" type="button" data-editpat>Ubah pola jadwal</button>
+    ${sectionTitle('Situs absen')}
+    <div class="list">${ABSEN.map(a=>`<div class="adj"><div class="adj__main"><div class="adj__name">${esc(a.label)} · ${esc(a.sub||'')}</div><div class="adj__meta">${esc(a.url)}</div></div></div>`).join('')}</div>
+    <button class="bigbtn bigbtn--ghost" type="button" data-editabsen>Ubah situs absen</button>
   </main>`;
 }
 const fmtKey = k => { const d=fromKey(k); return `${d.getDate()} ${BULAN3[d.getMonth()]} ${d.getFullYear()}`; };
@@ -545,9 +614,108 @@ function saveHolForm(){
   closeSheet(); render();
 }
 
-/* ---------------- Lembar: detail tanggal ---------------- */
-const sheetEl = () => document.getElementById('sheet');
+/* ---------------- Lembar (sheet) — util ---------------- */
+function sheetEl(){ return document.getElementById('sheet'); }
 function closeSheet(){ sheetEl().classList.remove('is-open'); addCtx=null; }
+
+/* ---------------- Lembar: editor situs absen ---------------- */
+let absDraft=null, absErr='';
+function openAbsenForm(){ absDraft = JSON.parse(JSON.stringify(ABSEN)); absErr=''; renderAbsenForm(); }
+function renderAbsenForm(){
+  sheetEl().innerHTML = `
+    <div class="sheet__card" role="dialog" aria-modal="true">
+      <div class="sheet__grab"></div>
+      <div class="sheet__head"><div><div class="sheet__eyebrow">Situs absen</div>
+        <div class="sheet__date">Ubah nama & alamat</div></div>
+        <button class="iconbtn" type="button" data-close>✕</button></div>
+      ${absErr?`<div class="warnbox">${esc(absErr)}</div>`:''}
+      ${absDraft.map((a,i)=>`
+        <div class="field"><label>${i===0?'Situs utama':'Situs cadangan'} — nama</label>
+          <input class="input" type="text" value="${esc(a.label)}" data-absfield="${i}.label" placeholder="mis. SI-PASTI"></div>
+        <div class="field"><label>${i===0?'Situs utama':'Situs cadangan'} — alamat (URL)</label>
+          <input class="input" type="url" inputmode="url" value="${esc(a.url)}" data-absfield="${i}.url" placeholder="https://contoh.go.id/"></div>`).join('')}
+      <p class="hint">Alamat harus diawali http:// atau https://. Tombol absen di Beranda langsung mengikuti perubahan ini.</p>
+      <button class="bigbtn" type="button" data-saveabsen>Simpan</button>
+      <button class="bigbtn bigbtn--ghost" type="button" data-resetabsen>Kembalikan ke bawaan</button>
+    </div>`;
+  sheetEl().classList.add('is-open');
+}
+function readAbsenInputs(){
+  sheetEl().querySelectorAll('[data-absfield]').forEach(inp=>{
+    const [i,f]=inp.dataset.absfield.split('.'); absDraft[+i][f]=inp.value.trim();
+  });
+}
+function saveAbsenForm(){
+  readAbsenInputs();
+  for (const a of absDraft){ if (!/^https?:\/\//i.test(a.url)){ absErr='Alamat tidak valid — harus diawali http:// atau https://'; renderAbsenForm(); return; } }
+  absDraft.forEach((a,i)=>{ if(!a.label) a.label = i===0?'Situs utama':'Situs cadangan'; if(!a.sub) a.sub = i===0?'Absen utama':'Absen cadangan'; });
+  saveAbsen(JSON.parse(JSON.stringify(absDraft))); closeSheet(); render();
+}
+function resetAbsenForm(){ absDraft = JSON.parse(JSON.stringify(ABSEN_DEFAULT)); absErr=''; renderAbsenForm(); }
+
+/* ---------------- Lembar: editor pola jadwal ---------------- */
+let patDraft=null, patConfirm=false;
+const SHIFT_SEQ=['P','S','M','L'];
+function draftRefUTC(dr){ const p=dr.ref.split('-').map(Number); return Date.UTC(p[0],p[1]-1,p[2]); }
+function draftShiftToday(dr,id){ const cyc=dr.cycle,L=cyc.length,ph=(dr.offsets[id]||0);
+  const dn=Math.round((Date.UTC(today.getFullYear(),today.getMonth(),today.getDate())-draftRefUTC(dr))/86400000);
+  return cyc[(((ph+dn)%L)+L)%L]; }
+function openPatternForm(){ patDraft = JSON.parse(JSON.stringify(SCHED)); patConfirm=false; renderPatternForm(); }
+function patAutoArrange(){ // siklus terurut blok P,S,M,L + offset merata → dijamin valid
+  const L=patDraft.cycle.length, per=L/4, cyc=[];
+  SHIFT_SEQ.forEach(s=>{ for(let i=0;i<per;i++) cyc.push(s); });
+  patDraft.cycle=cyc;
+  ROTATOR_IDS.forEach((id,i)=>{ patDraft.offsets[id]=i*per; });
+}
+function patSetLen(delta){
+  let L=patDraft.cycle.length+delta; if(L<4) L=4; if(L>16) L=16;
+  // regenerasi terurut blok + offset merata untuk panjang baru (valid)
+  patDraft.cycle=patDraft.cycle.slice(); patDraft.cycle.length=0;
+  const per=L/4; SHIFT_SEQ.forEach(s=>{ for(let i=0;i<per;i++) patDraft.cycle.push(s); });
+  ROTATOR_IDS.forEach((id,i)=>{ patDraft.offsets[id]=i*per; });
+}
+function renderPatternForm(){
+  const cov=coverageOf(patDraft), L=patDraft.cycle.length;
+  const cells = patDraft.cycle.map((c,i)=>`<button class="patcell patcell--${SHIFT[c].cls}" type="button" data-patcell="${i}">${c}</button>`).join('');
+  const offRows = ROTATOR_IDS.map(id=>{ const s=byId(id), now=draftShiftToday(patDraft,id);
+    return `<div class="offrow"><div class="offrow__nm">${esc(s.short)}</div>
+      <div class="stepper"><button class="stepper__b" type="button" data-patoff="${id}.-1">‹</button>
+        <span class="stepper__v">${patDraft.offsets[id]||0}</span>
+        <button class="stepper__b" type="button" data-patoff="${id}.1">›</button></div>
+      <div class="offrow__now"><span class="dotc dotc--${SHIFT[now].cls}"></span>${SHIFT[now].label}</div></div>`; }).join('');
+  const grid = `<div class="covgrid">
+    <div class="covgrid__h"><span>Hari</span>${ROTATOR_IDS.map(id=>`<span>${esc(byId(id).short)}</span>`).join('')}<span>✓</span></div>
+    ${cov.days.map(d=>`<div class="covgrid__r${d.ok?'':' covgrid__r--bad'}"><span>${d.d+1}</span>${d.shifts.map(sh=>`<span class="cv cv--${SHIFT[sh].cls}">${sh}</span>`).join('')}<span>${d.ok?'✓':'✗'}</span></div>`).join('')}</div>`;
+  const body = patConfirm ? `
+      <div class="warnbox warnbox--ask">Anda akan mengganti <b>pola jadwal</b>. Ini mengubah seluruh perhitungan jadwal, kalender, dan simulasi. Lanjut simpan?</div>
+      <button class="bigbtn" type="button" data-patsaveyes>Ya, simpan pola</button>
+      <button class="bigbtn bigbtn--ghost" type="button" data-patsaveno>Batal</button>` : `
+      <div class="field"><label>Pola siklus (ketuk untuk ganti P→S→M→L)</label>
+        <div class="patcells">${cells}</div>
+        <div class="patlen"><button class="chipbtn" type="button" data-patlen="-4">− 4 hari</button>
+          <span class="patlen__v">${L} hari</span>
+          <button class="chipbtn" type="button" data-patlen="4">+ 4 hari</button>
+          <button class="chipbtn chipbtn--accent" type="button" data-patauto>Auto-susun rapi</button></div></div>
+      <div class="field"><label>Tanggal acuan (posisi awal siklus)</label>
+        <input class="input" type="date" value="${patDraft.ref}" data-patref></div>
+      <div class="field"><label>Posisi awal tiap rotator (geser sampai cocok dgn jadwal nyata)</label>
+        ${offRows}</div>
+      <div class="field"><label>Pratinjau cakupan ${cov.ok?'<span class="okpill">valid</span>':'<span class="badpill">tidak valid</span>'}</label>
+        ${grid}
+        <p class="hint">Setiap hari harus tepat ada 1 Pagi, 1 Sore, 1 Malam, 1 Libur di antara 4 rotator. ${cov.ok?'':'Perbaiki pola/posisi hingga semua baris ✓, atau tekan “Auto-susun rapi”.'}</p></div>
+      <button class="bigbtn${cov.ok?'':' bigbtn--disabled'}" type="button" ${cov.ok?'data-patsave':'disabled'}>Simpan pola</button>
+      <button class="bigbtn bigbtn--ghost" type="button" data-patreset>Kembalikan ke pola bawaan</button>`;
+  sheetEl().innerHTML = `
+    <div class="sheet__card" role="dialog" aria-modal="true">
+      <div class="sheet__grab"></div>
+      <div class="sheet__head"><div><div class="sheet__eyebrow">Pola jadwal rotasi</div>
+        <div class="sheet__date">${isDefaultSched()&&!patConfirm?'Pola bawaan aktif':'Sesuaikan pola'}</div></div>
+        <button class="iconbtn" type="button" data-close>✕</button></div>
+      ${body}
+    </div>`;
+  sheetEl().classList.add('is-open');
+}
+function patSaveCommit(){ saveSched(JSON.parse(JSON.stringify(patDraft))); closeSheet(); render(); }
 
 function openDay(d){
   const date=new Date(state.y,state.m,d), r=resolveDay(date), hol=holiday(date);
@@ -925,6 +1093,22 @@ document.addEventListener('click', e => {
   const hsc=e.target.closest('[data-holscope]'); if(hsc){ holScope=hsc.dataset.holscope;
     sheetEl().querySelectorAll('.seg--hol .seg__b').forEach(b=>b.classList.toggle('seg__b--on', b.dataset.holscope===holScope)); return; }
   const dh=e.target.closest('[data-delhol]'); if(dh){ removeHol(dh.dataset.delhol); render(); return; }
+  // editor situs absen
+  if(e.target.closest('[data-editabsen]')){ openAbsenForm(); return; }
+  if(e.target.closest('[data-saveabsen]')){ saveAbsenForm(); return; }
+  if(e.target.closest('[data-resetabsen]')){ resetAbsenForm(); return; }
+  // editor pola jadwal
+  if(e.target.closest('[data-editpat]')){ openPatternForm(); return; }
+  const pc=e.target.closest('[data-patcell]'); if(pc){ const i=+pc.dataset.patcell;
+    const cur=SHIFT_SEQ.indexOf(patDraft.cycle[i]); patDraft.cycle[i]=SHIFT_SEQ[(cur+1)%4]; renderPatternForm(); return; }
+  const pl=e.target.closest('[data-patlen]'); if(pl){ patSetLen(+pl.dataset.patlen); renderPatternForm(); return; }
+  if(e.target.closest('[data-patauto]')){ patAutoArrange(); renderPatternForm(); return; }
+  const po=e.target.closest('[data-patoff]'); if(po){ const [id,dv]=po.dataset.patoff.split('.');
+    const L=patDraft.cycle.length; patDraft.offsets[id]=((((patDraft.offsets[id]||0)+ +dv)%L)+L)%L; renderPatternForm(); return; }
+  if(e.target.closest('[data-patsave]')){ patConfirm=true; renderPatternForm(); return; }
+  if(e.target.closest('[data-patsaveyes]')){ patSaveCommit(); return; }
+  if(e.target.closest('[data-patsaveno]')){ patConfirm=false; renderPatternForm(); return; }
+  if(e.target.closest('[data-patreset]')){ patDraft=JSON.parse(JSON.stringify(SCHED_DEFAULT)); patConfirm=false; renderPatternForm(); return; }
   if(e.target.closest('[data-addnext]')){ addNext(); return; }
   const cov=e.target.closest('[data-cover]'); if(cov){ applyCover(cov.dataset.cover); return; }
   const rpk=e.target.closest('[data-rangepick]'); if(rpk){ renderRangePicker(+rpk.dataset.rangepick); return; }
@@ -939,7 +1123,9 @@ document.addEventListener('click', e => {
   const sd=e.target.closest('[data-simdate]'); if(sd){ simDate=fromKey(sd.dataset.simdate); simScroll=true; render(); return; }
   if(e.target.closest('[data-close]')||e.target.id==='sheet'){ closeSheet(); }
 });
-document.addEventListener('change', e=>{ if(e.target.id==='simInput'){ simDate=fromKey(e.target.value); simScroll=true; render(); } });
+document.addEventListener('change', e=>{ if(e.target.id==='simInput'){ simDate=fromKey(e.target.value); simScroll=true; render(); }
+  else if(e.target.dataset && e.target.dataset.patref!==undefined){ if(e.target.value){ patDraft.ref=e.target.value; renderPatternForm(); } }
+  else if(e.target.dataset && e.target.dataset.absfield!==undefined){ readAbsenInputs(); } });
 document.addEventListener('keydown', e=>{ if(e.key==='Escape') closeSheet(); });
 
 render();
