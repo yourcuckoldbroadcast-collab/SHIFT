@@ -1,4 +1,27 @@
-# SHIFT-RAD
+# SHIFT-RAD 2.0 Beta
+
+> **Baseline Beta baru — Kalibrasi Jadwal.** 2.0 Beta menambahkan checkpoint posisi rotasi bertanggal tanpa memecah mesin jadwal menjadi engine terpisah.
+
+## Kontrak arsitektur 2.0 Beta
+
+- **Satu resolver, bukan multi-engine.** Pola dasar (`SCHED`) tetap sumber struktur siklus. Kalibrasi hanya menentukan posisi efektif pegawai pada tanggal tertentu sebelum resolver lama berjalan.
+- Urutan logika: **Pola dasar → checkpoint Kalibrasi → base shift → Penyesuaian (cuti/tukar/double/hutang) → `resolveDay()` → UI**.
+- Kalibrasi **tidak mengubah histori** sebelum tanggal efektif dan **tidak menulis ulang `SCHED.offsets`**.
+- Record Kalibrasi terikat pada fingerprint pola yang aktif saat dibuat. Jika struktur pola kemudian berubah, record lama otomatis **dinonaktifkan**, bukan dipaksakan ke pola baru.
+- Preview menampilkan **7 hari**, sedangkan integrity guard memeriksa minimal **1 siklus penuh** (`max(7, cycle.length)`). Peringatan tidak menjadi hard block: user dapat memilih tetap melanjutkan.
+- UI utama, navigasi, kalender, simulasi, serta sistem cuti/tukar/double tetap menggunakan alur yang sama; Kalibrasi berada di tab **Atur** sebagai fungsi khusus.
+
+## Fitur baru: Kalibrasi Jadwal
+
+1. Pilih tanggal mulai kalibrasi.
+2. Centang satu atau lebih rotator terdampak.
+3. Tentukan posisi awal tiap rotator (mis. Sore Pertama, Malam Kedua).
+4. Tinjau preview 7 hari.
+5. Integrity guard memberi peringatan bila ada shift kosong/ganda; user masih dapat memaksa simpan setelah konfirmasi.
+6. Riwayat kalibrasi dapat dihapus untuk mengembalikan perhitungan ke checkpoint sebelumnya/pola dasar.
+
+---
+
 
 Aplikasi jadwal shift **Instalasi Radiologi** — ringan, visual, dan **offline-first** (PWA). Berdiri sendiri, terpisah dari sistem absensi institusi.
 
@@ -56,7 +79,7 @@ Tab **Simulasi** memproyeksikan jadwal ke masa depan (engine deterministik, jadi
 | Rotator | Didit, Humaidi, Aldi, Luthfi | Siklus 8 hari: **P P · S S · M M · L L**, masing-masing digeser fase 2 hari → tiap hari selalu ada 1 Pagi, 1 Sore, 1 Malam, 1 Libur |
 | Cadangan | dr. Dina, Anisa, Muhraini, Ano | **Pagi** di hari kerja, **Libur** tiap Minggu + tanggal merah |
 
-**Jadwal = pola dasar (deterministik) + penyesuaian.** Pola dasar diproyeksikan dari satu titik jangkar (1 Mei 2026), jadi "tanggal X tahun Y aku shift apa" cukup dihitung, bukan ditebak.
+**Jadwal 2.0 Beta = pola dasar deterministik + checkpoint Kalibrasi bertanggal + penyesuaian.** Tanggal acuan awal (1 Mei 2026) tetap menjadi fallback dasar, tetapi seorang rotator dapat memiliki checkpoint posisi baru mulai tanggal tertentu. Resolver selalu mengambil checkpoint terbaru yang valid untuk tanggal yang ditanyakan, lalu meneruskan hasilnya ke sistem penyesuaian lama.
 
 ---
 

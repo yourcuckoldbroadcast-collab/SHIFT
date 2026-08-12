@@ -1,9 +1,10 @@
 'use strict';
 
 /* ============================================================
-   SHIFT RADIOLOGI — engine + UI  (v0.3)
-   v0.3: PENYESUAIAN JADWAL — cuti, pengganti berwarna (hijau/oranye/
-         merah), double shift, arsip hutang dinas, deteksi konflik.
+   SHIFT-RAD 2.0 BETA — layered schedule resolver
+   2.0 Beta: KALIBRASI JADWAL bertanggal. Engine tetap satu; kalibrasi
+             hanya menjadi checkpoint posisi efektif sebelum resolver
+             lama memproses cuti, tukar, double, hutang dinas, dll.
    Pengguna: Fakhrul Aldia (Aldi). Offline-first PWA.
    ============================================================ */
 
@@ -28,7 +29,35 @@ function saveSched(s){ try{ localStorage.setItem(SCHED_KEY, JSON.stringify(s)); 
 function resetSched(){ try{ localStorage.removeItem(SCHED_KEY); }catch(e){} SCHED = JSON.parse(JSON.stringify(SCHED_DEFAULT)); }
 const isDefaultSched = () => JSON.stringify(SCHED.cycle)===JSON.stringify(SCHED_DEFAULT.cycle)
   && JSON.stringify(SCHED.offsets)===JSON.stringify(SCHED_DEFAULT.offsets);
-function refUTC(){ const p=SCHED.ref.split('-').map(Number); return Date.UTC(p[0], p[1]-1, p[2]); }
+/* ---------------- Kalibrasi jadwal (2.0 Beta) ----------------
+   Catatan arsitektur: ini BUKAN engine kedua. Record kalibrasi hanya
+   checkpoint posisi siklus yang efektif mulai tanggal tertentu. Setelah
+   posisi efektif ditemukan, seluruh resolver lama tetap dipakai. */
+const CAL_KEY = 'shift-radiologi-calibration-v1';
+function schedFingerprint(s=SCHED){
+  return JSON.stringify({ cycle:s.cycle, ref:s.ref, offsets:s.offsets });
+}
+function loadCal(){
+  try{ const v=JSON.parse(localStorage.getItem(CAL_KEY)); return Array.isArray(v)?v:[]; }catch(e){ return []; }
+}
+let CAL = loadCal();
+function saveCal(){ try{ localStorage.setItem(CAL_KEY, JSON.stringify(CAL)); return true; }catch(e){ return false; } }
+function addCal(rec){
+  rec.id = rec.id || ('k'+Date.now()+Math.floor(Math.random()*1000));
+  rec.createdAt = rec.createdAt || Date.now();
+  CAL.push(rec);
+  CAL.sort((a,b)=>a.date===b.date ? (a.createdAt||0)-(b.createdAt||0) : (a.date<b.date?-1:1));
+  saveCal();
+}
+function removeCal(id){ CAL = CAL.filter(c=>c.id!==id); saveCal(); }
+function activeCalibrationFor(staffId, date, list=CAL, sched=SCHED){
+  const k=keyOf(date), sig=schedFingerprint(sched); let best=null;
+  for (const c of list){
+    if (!c || c.patternSig!==sig || c.date>k || !c.positions || c.positions[staffId]==null) continue;
+    if (!best || c.date>best.date || (c.date===best.date && (c.createdAt||0)>=(best.createdAt||0))) best=c;
+  }
+  return best;
+}
 
 const STAFF = [
   { id:'dina',     name:'dr. Dina Rahman, Sp.Rad',         short:'dr. Dina', role:'Dokter Sp. Radiologi',  type:'cadangan', canSub:false, phone:'085156862399' },
@@ -138,7 +167,6 @@ function coverageOf(sched){
   }
   return { ok, days, L };
 }
-const dayNo  = d => Math.round((Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()) - refUTC())/86400000);
 const pad    = n => String(n).padStart(2,'0');
 const keyOf  = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
 const fromKey= k => { const [y,m,da]=k.split('-').map(Number); return new Date(y,m-1,da); };
@@ -154,12 +182,27 @@ const holiday= d => { const h=holidayInfo(d); return h?h.name:null; };
 const sameDay= (a,b)=> a.getFullYear()===b.getFullYear()&&a.getMonth()===b.getMonth()&&a.getDate()===b.getDate();
 const esc    = s => String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
+function rawRotatorPosition(s, d, calList=CAL, sched=SCHED){
+  const L=sched.cycle.length;
+  const c=activeCalibrationFor(s.id,d,calList,sched);
+  if (c){
+    const start=fromKey(c.date);
+    const delta=Math.round((Date.UTC(d.getFullYear(),d.getMonth(),d.getDate())-Date.UTC(start.getFullYear(),start.getMonth(),start.getDate()))/86400000);
+    const pos=+c.positions[s.id]||0;
+    return (((pos+delta)%L)+L)%L;
+  }
+  // fallback identik dengan engine lama: offset global dari tanggal acuan SCHED.ref
+  const p=sched.ref.split('-').map(Number);
+  const dn=Math.round((Date.UTC(d.getFullYear(),d.getMonth(),d.getDate())-Date.UTC(p[0],p[1]-1,p[2]))/86400000);
+  const ph=(sched.offsets[s.id]||0);
+  return (((ph+dn)%L)+L)%L;
+}
+function rawRotatorShift(s, d, calList=CAL, sched=SCHED){ return sched.cycle[rawRotatorPosition(s,d,calList,sched)]; }
 function baseShiftOf(s, d){
   const h = holidayInfo(d);
   if (s.type==='rotator'){
     if (h && h.scope==='all') return 'L';            // libur instansi menyeluruh → rotator ikut libur
-    const cyc=SCHED.cycle, L=cyc.length, ph=(SCHED.offsets[s.id]||0);
-    return cyc[(((ph+dayNo(d))%L)+L)%L];
+    return rawRotatorShift(s,d);
   }
   return (isSun(d)||h) ? 'L' : 'P';                  // cadangan/dinas pagi libur tiap Minggu & semua tanggal merah
 }
@@ -273,11 +316,14 @@ function userInfo(date){
 function dayHasAdj(date){ const k=keyOf(date); return ADJ.some(a=>a.date===k || (a.coverage&&a.coverage.debt&&a.repay&&a.repay.date===k)); }
 // Fase shift pengguna: hari ke-n dari total hari blok shift yang sama (siklus 2-harian → 1/2 atau 2/2)
 function cyclePhase(date){
-  if (USER.type!=='rotator') return null;
-  const base = baseShiftOf(USER, date), L = SCHED.cycle.length;
+  if (USER.type!=='rotator' || (holidayInfo(date)||{}).scope==='all') return null;
+  // Fase dibaca dari posisi efektif di siklus, bukan dari histori hari sebelumnya.
+  // Ini penting agar checkpoint Kalibrasi seperti "Sore Pertama" benar-benar tampil KE-1
+  // meskipun sehari sebelum tanggal kalibrasi kebetulan juga shift Sore.
+  const cyc=SCHED.cycle, L=cyc.length, pos=rawRotatorPosition(USER,date), base=cyc[pos];
   let back=0, fwd=0;
-  for (let i=1;i<=L;i++){ if (baseShiftOf(USER, addDays(date,-i))===base) back++; else break; }
-  for (let i=1;i<=L;i++){ if (baseShiftOf(USER, addDays(date, i))===base) fwd++;  else break; }
+  for(let i=1;i<L;i++){ if(cyc[((pos-i)%L+L)%L]===base) back++; else break; }
+  for(let i=1;i<L-back;i++){ if(cyc[(pos+i)%L]===base) fwd++; else break; }
   return { n:back+1, total:back+1+fwd, base };
 }
 
@@ -419,7 +465,7 @@ function renderBeranda(){
         <div class="brand">
           <svg class="brand__mark" viewBox="0 0 100 100" aria-hidden="true"><g fill="#1f9d6b"><circle cx="50" cy="50" r="10.5"/><polygon points="71.50,12.76 67.49,10.72 63.29,9.10 58.94,7.94 54.49,7.24 50.00,7.00 45.51,7.24 41.06,7.94 36.71,9.10 32.51,10.72 28.50,12.76 41.00,34.41 42.68,33.56 44.44,32.88 46.26,32.39 48.12,32.10 50.00,32.00 51.88,32.10 53.74,32.39 55.56,32.88 57.32,33.56 59.00,34.41"/><polygon points="7.00,50.00 7.24,54.49 7.94,58.94 9.10,63.29 10.72,67.49 12.76,71.50 15.21,75.27 18.04,78.77 21.23,81.96 24.73,84.79 28.50,87.24 41.00,65.59 39.42,64.56 37.96,63.38 36.62,62.04 35.44,60.58 34.41,59.00 33.56,57.32 32.88,55.56 32.39,53.74 32.10,51.88 32.00,50.00"/><polygon points="71.50,87.24 75.27,84.79 78.77,81.96 81.96,78.77 84.79,75.27 87.24,71.50 89.28,67.49 90.90,63.29 92.06,58.94 92.76,54.49 93.00,50.00 68.00,50.00 67.90,51.88 67.61,53.74 67.12,55.56 66.44,57.32 65.59,59.00 64.56,60.58 63.38,62.04 62.04,63.38 60.58,64.56 59.00,65.59"/></g></svg>
           <span class="brand__div"></span>
-          <span class="brand__txt"><span class="brand__name">SHIFT-RAD</span><span class="brand__tag">SAFE · PRECISE · CARING</span></span>
+          <span class="brand__txt"><span class="brand__name">SHIFT-RAD</span><span class="brand__tag">2.0 BETA · SAFE · PRECISE · CARING</span></span>
         </div>
       </div>
       <div class="pfp-wrap">
@@ -511,6 +557,95 @@ function renderKalender(){
   </main>`;
 }
 
+/* ---------------- Kalibrasi jadwal 2.0 Beta ---------------- */
+const ORDINAL_ID=['Pertama','Kedua','Ketiga','Keempat','Kelima','Keenam','Ketujuh','Kedelapan'];
+function cyclePositionOptions(cycle=SCHED.cycle){
+  const totals={P:0,S:0,M:0,L:0}, seen={P:0,S:0,M:0,L:0};
+  cycle.forEach(sh=>{ if(totals[sh]!=null) totals[sh]++; });
+  return cycle.map((sh,i)=>{ seen[sh]++; const ord=totals[sh]>1 ? ` ${ORDINAL_ID[seen[sh]-1]||('#'+seen[sh])}` : '';
+    return { index:i, shift:sh, label:`${SHIFT[sh].label}${ord}` }; });
+}
+function calCoverageFrom(startDate, calList, days){
+  const out=[];
+  for(let i=0;i<days;i++){
+    const date=addDays(startDate,i), shifts=ROTATOR_IDS.map(id=>rawRotatorShift(byId(id),date,calList,SCHED));
+    const cnt={P:0,S:0,M:0,L:0}; shifts.forEach(sh=>{ if(cnt[sh]!=null) cnt[sh]++; });
+    const missing=['P','S','M','L'].filter(sh=>cnt[sh]===0);
+    const duplicate=['P','S','M','L'].filter(sh=>cnt[sh]>1);
+    out.push({date,shifts,cnt,missing,duplicate,ok:missing.length===0&&duplicate.length===0});
+  }
+  return out;
+}
+function calibrationIssues(startDate, calList){
+  const days=Math.max(7,SCHED.cycle.length), cov=calCoverageFrom(startDate,calList,days);
+  const issues=[];
+  for(const d of cov){
+    for(const sh of d.missing) issues.push({type:'missing',sh,date:keyOf(d.date)});
+    for(const sh of d.duplicate) issues.push({type:'duplicate',sh,date:keyOf(d.date),count:d.cnt[sh]});
+  }
+  return {days,cov,issues};
+}
+function issueSummary(issues){
+  if(!issues.length) return '';
+  const missM=issues.find(x=>x.type==='missing'&&x.sh==='M');
+  if(missM) return `Perubahan jadwal ini mengganggu integritas jadwal karena kehilangan petugas dinas malam pada ${fmtKey(missM.date)}, apakah anda yakin tetap melanjutkan?`;
+  const miss=issues.find(x=>x.type==='missing');
+  if(miss) return `Perubahan jadwal ini mengganggu integritas jadwal karena kehilangan petugas dinas ${SHIFT[miss.sh].label.toLowerCase()} pada ${fmtKey(miss.date)}, apakah anda yakin tetap melanjutkan?`;
+  const dup=issues.find(x=>x.type==='duplicate');
+  return `Perubahan jadwal ini mengganggu integritas jadwal karena terdapat ${dup.count} petugas dinas ${SHIFT[dup.sh].label.toLowerCase()} pada ${fmtKey(dup.date)}, apakah anda yakin tetap melanjutkan?`;
+}
+function incompatibleCalibrationCount(){ const sig=schedFingerprint(); return CAL.filter(c=>c.patternSig!==sig).length; }
+function calRecordLabel(c){
+  const opts=cyclePositionOptions(Array.isArray(c.cycleSnapshot)&&c.cycleSnapshot.length?c.cycleSnapshot:SCHED.cycle);
+  const parts=Object.keys(c.positions||{}).map(id=>`${byId(id)?.short||id}: ${opts[+c.positions[id]]?.label||('posisi '+c.positions[id])}`);
+  return parts.join(' · ');
+}
+let calDraft=null, calConfirm=false, calErr='';
+function openCalibrationForm(){
+  const positions={}, selected={};
+  ROTATOR_IDS.forEach(id=>{ selected[id]=false; positions[id]=rawRotatorPosition(byId(id),today,CAL,SCHED); });
+  calDraft={date:keyOf(today),positions,selected}; calConfirm=false; calErr=''; renderCalibrationForm();
+}
+function draftCalList(){
+  const positions={}; ROTATOR_IDS.forEach(id=>{ if(calDraft.selected[id]) positions[id]=+calDraft.positions[id]; });
+  const temp={id:'draft',date:calDraft.date,positions,patternSig:schedFingerprint(),createdAt:Number.MAX_SAFE_INTEGER};
+  return CAL.concat(temp);
+}
+function renderCalibrationForm(){
+  const start=fromKey(calDraft.date), opts=cyclePositionOptions(), chosen=ROTATOR_IDS.filter(id=>calDraft.selected[id]);
+  const test=calibrationIssues(start,draftCalList()), preview=test.cov.slice(0,7);
+  const rows=ROTATOR_IDS.map(id=>{ const st=byId(id), on=calDraft.selected[id]; return `<div class="calstaff${on?' calstaff--on':''}">
+    <label class="calstaff__check"><input type="checkbox" data-calcheck="${id}" ${on?'checked':''}><span>${esc(st.short)}</span></label>
+    <select class="select calstaff__select" data-calpos="${id}" ${on?'':'disabled'}>${opts.map(o=>`<option value="${o.index}" ${+calDraft.positions[id]===o.index?'selected':''}>${esc(o.label)}</option>`).join('')}</select>
+  </div>`; }).join('');
+  const grid=`<div class="covgrid calgrid"><div class="covgrid__h"><span>Hari</span>${ROTATOR_IDS.map(id=>`<span>${esc(byId(id).short)}</span>`).join('')}<span>✓</span></div>
+    ${preview.map((d,i)=>`<div class="covgrid__r${d.ok?'':' covgrid__r--bad'}"><span>${d.date.getDate()}</span>${d.shifts.map(sh=>`<span class="cv cv--${SHIFT[sh].cls}">${sh}</span>`).join('')}<span>${d.ok?'✓':'✗'}</span></div>`).join('')}</div>`;
+  const issue=test.issues.length?`<div class="warnbox">${esc(issueSummary(test.issues))}<br><span class="calnote">Validasi internal memeriksa ${test.days} hari; preview menampilkan 7 hari pertama.</span></div>`:
+    `<div class="panel panel--ok calok"><div class="panel__h">✓ Integritas jadwal terjaga</div><div class="panel__sub">Tidak ditemukan shift kosong atau ganda dalam ${test.days} hari pemeriksaan.</div></div>`;
+  const body=calConfirm?`<div class="warnbox warnbox--ask">${esc(issueSummary(test.issues))}</div>
+      <button class="bigbtn" type="button" data-calsaveyes>Ya, tetap simpan kalibrasi</button>
+      <button class="bigbtn bigbtn--ghost" type="button" data-calsaveno>Batal</button>`:
+    `<div class="field"><label>Berlaku mulai</label><input class="input" type="date" value="${calDraft.date}" data-caldate></div>
+     <div class="field"><label>Petugas terdampak</label>${rows}<p class="hint">Centang hanya petugas yang posisinya di-reset. Petugas lain tetap mengikuti checkpoint/pola yang sudah berlaku.</p></div>
+     <div class="field"><label>Preview 7 hari</label>${grid}</div>${issue}${calErr?`<div class="warnbox">${esc(calErr)}</div>`:''}
+     <button class="bigbtn" type="button" data-calsave>Simpan kalibrasi</button>`;
+  sheetEl().innerHTML=`<div class="sheet__card" role="dialog" aria-modal="true"><div class="sheet__grab"></div>
+    <div class="sheet__head"><div><div class="sheet__eyebrow">Kalibrasi Jadwal · 2.0 Beta</div><div class="sheet__date">Reset posisi rotasi</div></div><button class="iconbtn" type="button" data-close>✕</button></div>${body}</div>`;
+  sheetEl().classList.add('is-open');
+}
+function commitCalibration(forced=false){
+  const positions={}; ROTATOR_IDS.forEach(id=>{ if(calDraft.selected[id]) positions[id]=+calDraft.positions[id]; });
+  if(!Object.keys(positions).length){ calErr='Pilih minimal satu petugas yang terdampak.'; calConfirm=false; renderCalibrationForm(); return; }
+  const test=calibrationIssues(fromKey(calDraft.date),draftCalList());
+  addCal({date:calDraft.date,positions,patternSig:schedFingerprint(),cycleSnapshot:[...SCHED.cycle],forced:!!forced,issues:test.issues.slice(0,12)});
+  closeSheet(); render();
+}
+function requestCalibrationSave(){
+  if(!ROTATOR_IDS.some(id=>calDraft.selected[id])){ calErr='Pilih minimal satu petugas yang terdampak.'; renderCalibrationForm(); return; }
+  const test=calibrationIssues(fromKey(calDraft.date),draftCalList());
+  if(test.issues.length){ calConfirm=true; calErr=''; renderCalibrationForm(); } else commitCalibration(false);
+}
+
 /* ---------------- Atur (penyesuaian) ---------------- */
 function adjLabel(a){
   if (a.type==='swap')   return { name:`${byId(a.aId).short} ⇄ ${byId(a.bId).short}`, detail:'Tukar shift' };
@@ -526,6 +661,9 @@ function renderAtur(){
   const conflicts = allConflicts();
   const debts = debtList();
   const sorted = [...ADJ].sort((a,b)=>a.date<b.date?-1:1);
+  const calSorted = CAL.slice().sort((a,b)=>a.date===b.date?(b.createdAt||0)-(a.createdAt||0):(a.date<b.date?1:-1));
+  const activeSig = schedFingerprint();
+  const inactiveCal = incompatibleCalibrationCount();
 
   const conflictHTML = conflicts.length ? `<div class="panel panel--warn">
     <div class="panel__h">⚠ Konflik — shift kosong</div>
@@ -561,9 +699,16 @@ function renderAtur(){
       <button class="adj__del" type="button" data-delhol="${h.date}" aria-label="Hapus">✕</button></div>`).join('')
     : `<div class="empty">Belum ada hari libur instansi. Tambahkan bila instansi menetapkan libur di luar tanggal merah nasional.</div>`;
 
+  const calHTML = calSorted.length ? calSorted.map(c=>{ const active=c.patternSig===activeSig; return `<div class="adj${active?'':' adj--inactive'}">
+      <div class="adj__main"><div class="adj__name">Mulai ${fmtKey(c.date)}${c.forced?' · dipaksa':''}${active?'':' · nonaktif'}</div>
+        <div class="adj__meta">${esc(calRecordLabel(c))}${active?'':' · pola berbeda'}</div></div>
+      <button class="adj__del" type="button" data-delcal="${c.id}" aria-label="Hapus kalibrasi">✕</button></div>`; }).join('')
+    : `<div class="empty">Belum ada kalibrasi. Pola dasar masih menjadi satu-satunya titik acuan.</div>`;
+  const calInactive = inactiveCal ? `<div class="warnbox cal-inactive">${inactiveCal} kalibrasi lama dinonaktifkan karena dibuat dengan pola jadwal yang berbeda. Record tetap terlihat sebagai riwayat dan dapat dihapus.</div>` : '';
+
   return `
   <header class="topbar topbar--cal"><div class="topbar__row"><h1 class="cal__title">Atur</h1></div>
-    <div class="cal__sub">Penyesuaian, hari libur instansi, hutang dinas & konflik</div></header>
+    <div class="cal__sub">Shift-Rad 2.0 Beta · penyesuaian, kalibrasi, pola & integritas jadwal</div></header>
   <main class="page">
     ${conflictHTML}
     ${sectionTitle('Penyesuaian aktif')}
@@ -573,6 +718,11 @@ function renderAtur(){
     <button class="bigbtn bigbtn--ghost" type="button" data-addhol>+ Tambah hari libur instansi</button>
     ${sectionTitle('Arsip hutang dinas')}
     <div class="list">${debtHTML}</div>
+    ${sectionTitle('Kalibrasi jadwal')}
+    ${calInactive}
+    <div class="list">${calHTML}</div>
+    <button class="bigbtn bigbtn--ghost" type="button" data-editcal>Kalibrasi jadwal</button>
+    <p class="hint cal-section-hint">Reset posisi rotasi mulai tanggal tertentu tanpa mengubah pola dasar atau histori sebelum tanggal tersebut.</p>
     ${sectionTitle('Pola jadwal rotasi')}
     <div class="list"><div class="adj">
       <div class="adj__main"><div class="adj__name">${isDefaultSched()?'Pola bawaan':'Pola khusus'} · siklus ${SCHED.cycle.length} hari</div>
@@ -686,8 +836,9 @@ function renderPatternForm(){
   const grid = `<div class="covgrid">
     <div class="covgrid__h"><span>Hari</span>${ROTATOR_IDS.map(id=>`<span>${esc(byId(id).short)}</span>`).join('')}<span>✓</span></div>
     ${cov.days.map(d=>`<div class="covgrid__r${d.ok?'':' covgrid__r--bad'}"><span>${d.d+1}</span>${d.shifts.map(sh=>`<span class="cv cv--${SHIFT[sh].cls}">${sh}</span>`).join('')}<span>${d.ok?'✓':'✗'}</span></div>`).join('')}</div>`;
+  const calWillDisable = CAL.some(c=>c.patternSig!==schedFingerprint(patDraft));
   const body = patConfirm ? `
-      <div class="warnbox warnbox--ask">Anda akan mengganti <b>pola jadwal</b>. Ini mengubah seluruh perhitungan jadwal, kalender, dan simulasi. Lanjut simpan?</div>
+      <div class="warnbox warnbox--ask">Anda akan mengganti <b>pola jadwal</b>. Ini mengubah seluruh perhitungan jadwal, kalender, dan simulasi.${calWillDisable?' Kalibrasi yang dibuat dengan pola sebelumnya akan dinonaktifkan agar tidak diterapkan pada struktur siklus yang berbeda.':''} Lanjut simpan?</div>
       <button class="bigbtn" type="button" data-patsaveyes>Ya, simpan pola</button>
       <button class="bigbtn bigbtn--ghost" type="button" data-patsaveno>Batal</button>` : `
       <div class="field"><label>Pola siklus (ketuk untuk ganti P→S→M→L)</label>
@@ -1097,6 +1248,13 @@ document.addEventListener('click', e => {
   if(e.target.closest('[data-editabsen]')){ openAbsenForm(); return; }
   if(e.target.closest('[data-saveabsen]')){ saveAbsenForm(); return; }
   if(e.target.closest('[data-resetabsen]')){ resetAbsenForm(); return; }
+  // kalibrasi jadwal 2.0 Beta
+  if(e.target.closest('[data-editcal]')){ openCalibrationForm(); return; }
+  const cc=e.target.closest('[data-calcheck]'); if(cc){ const id=cc.dataset.calcheck; calDraft.selected[id]=cc.checked; calConfirm=false; calErr=''; renderCalibrationForm(); return; }
+  if(e.target.closest('[data-calsave]')){ requestCalibrationSave(); return; }
+  if(e.target.closest('[data-calsaveyes]')){ commitCalibration(true); return; }
+  if(e.target.closest('[data-calsaveno]')){ calConfirm=false; renderCalibrationForm(); return; }
+  const dc=e.target.closest('[data-delcal]'); if(dc){ removeCal(dc.dataset.delcal); render(); return; }
   // editor pola jadwal
   if(e.target.closest('[data-editpat]')){ openPatternForm(); return; }
   const pc=e.target.closest('[data-patcell]'); if(pc){ const i=+pc.dataset.patcell;
@@ -1124,6 +1282,8 @@ document.addEventListener('click', e => {
   if(e.target.closest('[data-close]')||e.target.id==='sheet'){ closeSheet(); }
 });
 document.addEventListener('change', e=>{ if(e.target.id==='simInput'){ simDate=fromKey(e.target.value); simScroll=true; render(); }
+  else if(e.target.dataset && e.target.dataset.caldate!==undefined){ if(e.target.value){ calDraft.date=e.target.value; calConfirm=false; calErr=''; renderCalibrationForm(); } }
+  else if(e.target.dataset && e.target.dataset.calpos!==undefined){ calDraft.positions[e.target.dataset.calpos]=+e.target.value; calConfirm=false; calErr=''; renderCalibrationForm(); }
   else if(e.target.dataset && e.target.dataset.patref!==undefined){ if(e.target.value){ patDraft.ref=e.target.value; renderPatternForm(); } }
   else if(e.target.dataset && e.target.dataset.absfield!==undefined){ readAbsenInputs(); } });
 document.addEventListener('keydown', e=>{ if(e.key==='Escape') closeSheet(); });
